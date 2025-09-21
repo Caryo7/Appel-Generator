@@ -1,3 +1,6 @@
 **/*.xlsx
 /src/__pycache__/
 /venv/
+/dist/
+/build/
+/releases/

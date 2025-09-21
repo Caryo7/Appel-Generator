@@ -1,0 +1,1 @@
+pyinstaller AppelGenerator.spec --noconfirm
