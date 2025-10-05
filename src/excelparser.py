@@ -48,9 +48,9 @@ class Colle:
         self.colle_id = colle_id
 
     def __repr__(self):
-        return '{groupe}-{semaine}'.format(
+        return '{groupe}-{colle_id}'.format(
             groupe = self.groupe,
-            semaine = self.semaine
+            colle_id = self.colle_id
             )
 
 def read_colloscope(path, config):
