@@ -1,4 +1,5 @@
 import excelparser
+import edtfiller
 import dialogs
 import config as confr
 
@@ -6,7 +7,7 @@ import os
 import sys
 from pathlib import Path
 
-def create_appel():
+def ask_config():
     dialogs.clear()
     p = Path('config/')
     dialogs.text('Bienvenue, veuillez choisir une configuration')
@@ -17,6 +18,11 @@ def create_appel():
     item = dialogs.question()
     config_file = config_files[int(item)-1]
     config = confr.Configuration(config_file)
+
+    return config
+
+def create_appel():
+    config = ask_config()
 
     excel_file = dialogs.question('Lien vers le fichier Excel', default = config.input_file)
     output_file = dialogs.question('Fichier Excel de sortie', default = config.output_file)
@@ -38,6 +44,24 @@ def create_appel():
 
     dialogs.end()
     return 1
+
+def create_edts():
+    config = ask_config()
+
+    excel_file = dialogs.question('Lien vers le fichier Excel', default = config.input_file)
+    table = excelparser.read_colloscope(excel_file, config)
+    semaine = dialogs.question('Semaine à générer')
+    thistable = excelparser.selector(table, semaine)
+    groupes = excelparser.sort_groupes(thistable)
+    excel_edt = dialogs.question('Lien vers le fichier Excel EDT', default = 'EDT-PT.xlsx')
+    folder = dialogs.question('Lien vers le dossier de sortie', default = 'output/')
+    r = edtfiller.fill_edt(groupes, excel_edt, folder)
+    edtfiller.clear()
+    if not r:
+        return 0
+
+    #edtfiller.excel.Quit()
+    #del edtfiller.excel
 
 def aide():
     dialogs.clear()
@@ -77,6 +101,7 @@ if __name__ == '__main__':
     dialogs.text('''Programme de gestion du colloscope''')
     actions = [
         (create_appel, 'Créer une feuille d\'appel'),
+        (create_edts, 'Créer les emplois du temps pour une semaine'),
         (aide, 'Aide'),
         (quitter, 'Quitter'),
         ]
@@ -92,6 +117,6 @@ if __name__ == '__main__':
             dialogs.item(i+1, title)
 
         dialogs.text()
-        action_id = dialogs.question('Choix', default = 3)
+        action_id = dialogs.question('Choix', default = len(actions))
         fnct = actions[int(action_id)-1][0]
         e = fnct()
