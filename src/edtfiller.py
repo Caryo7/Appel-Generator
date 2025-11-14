@@ -164,7 +164,7 @@ def fill_edt(groupes, path, folder):
         pc = int(100*i/n)
         if pc != opc:
             opc = pc
-            dialogs.text('\r [' + '='*(int(pc/5)) + ' '*(20-int(pc/5)) + '] {} %'.format(pc))
+            dialogs.text('\r [' + '='*(int(pc/5)) + ' '*(20-int(pc/5)) + '] {} %'.format(pc), end = '')
 
     return True
 

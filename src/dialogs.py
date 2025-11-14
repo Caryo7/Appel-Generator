@@ -18,7 +18,7 @@ def warning(*data, sep = ' '):
 
     print('\x1b[31;5m', txt, '\x1b[0m')
 
-def question(text = '', default = None, prompt = '>>>'):
+def question(text = '', default = None, prompt = '>>>', type = None):
     if default is not None:
         df = '\x1b[34m[{}]'.format(default)
     else:
@@ -28,9 +28,14 @@ def question(text = '', default = None, prompt = '>>>'):
     ask = input('   \x1b[35;5m' + prompt + '\x1b[0m ')
     print()
     if not ask:
-        return default
+        data = default
+    else:
+        data = ask
 
-    return ask
+    if type is not None:
+        data = type(data)
+
+    return data
 
 def end(action = 'revenir au menu principal'):
     input(f' \x1b[34mAppuyez sur \x1b[37;5mEntrée\x1b[0m \x1b[34mpour {action}...')
