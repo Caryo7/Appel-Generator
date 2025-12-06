@@ -6,3 +6,4 @@
 /releases/
 /src/venv/
 **/*.pdf
+*.zip
