@@ -55,7 +55,7 @@ def create_edts():
     groupes = excelparser.sort_groupes(thistable)
     excel_edt = dialogs.question('Lien vers le fichier Excel EDT', default = 'EDT-PT.xlsx')
     folder = dialogs.question('Lien vers le dossier de sortie', default = 'output/')
-    r = edtfiller.fill_edt(groupes, excel_edt, folder)
+    r = edtfiller.fill_edt(groupes, excel_edt, folder, semaine)
     edtfiller.clear()
     if not r:
         return 0

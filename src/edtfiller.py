@@ -1,7 +1,9 @@
 import openpyxl as xl
 import os
+from zipfile import *
 from win32com.client import DispatchEx
 from pathlib import Path
+from datetime import datetime
 
 import dialogs
 
@@ -89,6 +91,12 @@ class EDT:
                 if v.upper() == 'COLLE':
                     self.sh.cell(column=col, row = row).value = None
 
+                elif v.upper() == 'DATE':
+                    self.sh.cell(column=col, row = row).value = datetime.today().strftime("%d/%m/%y")
+
+                elif v.upper() == 'HEURE':
+                    self.sh.cell(column=col, row = row).value = datetime.today().strftime("%H:%M")
+
         fp = os.path.join(os.path.abspath('.'), folder, 'groupe-{}'.format(self.groupe))
         #try:
         self.wb.save(fp + '.xlsx')
@@ -109,7 +117,7 @@ class EDT:
 
             #return False
 
-        return True
+        return fp + '.pdf'
 
 def import_edt(path):
     """Ouvre l'emploi du temps des élèves, et en fait une "copie"
@@ -123,7 +131,29 @@ def import_edt(path):
     e = EDT(path)
     return e
 
-def fill_edt(groupes, path, folder):
+def zip_output(paths, semaine, folder):
+    """Une fois l'enregistrement terminé, on peut mettre dans un fichier ZIP
+    l'intégralité des EDT de sortie. Pour cela,
+    Arguments
+    * paths  : la liste des fichiers à mettre en ZIP
+    * semaine: le numéro de la semaine
+
+    Ne retourne rien
+    """
+
+    z = ZipFile(f'./{folder}/output-S{semaine}.zip', 'w', compression=ZIP_DEFLATED, compresslevel=9)
+    for fp in paths:
+        f = open(fp, 'rb')
+        data = f.read()
+        f.close()
+
+        fz = z.open(fp.split('/')[-1], 'w')
+        fz.write(data)
+        fz.close()
+
+    z.close()
+
+def fill_edt(groupes, path, folder, semaine_nb):
     """Avec un dictionnaire des groupes de colle et un emploi du temps,
     vient remplir les trous volontairement laissés par le professeur
     en charge de la création des emplois du temps.
@@ -135,12 +165,14 @@ def fill_edt(groupes, path, folder):
     * groupes : dictionnaires (groupe: colles)
     * path    : Fichier emploi du temps
     * folder  : dossier de sortie des emplois du temps générés
+    * semaine : le numéro de la semaine en cours
     """
 
     n = len(groupes)
     i = 0
     pc = 0.0
     opc = 0.0
+    fps = []
     for groupe, semaine in groupes.items():
         groupe_id = semaine.groupe_id
         edt = EDT(path)
@@ -160,12 +192,14 @@ def fill_edt(groupes, path, folder):
         if not r:
             return False
 
+        fps.append(r)
         i += 1
         pc = int(100*i/n)
         if pc != opc:
             opc = pc
             dialogs.text('\r [' + '='*(int(pc/5)) + ' '*(20-int(pc/5)) + '] {} %'.format(pc), end = '')
 
+    zip_output(fps, semaine_nb, folder)
     return True
 
 def clear():
