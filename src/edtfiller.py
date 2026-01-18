@@ -37,7 +37,7 @@ class EDT:
         self.wb = xl.load_workbook(path)
         self.colles = []
         
-    def me(self, groupe, semaine):
+    def me(self, groupe, semaine, colle):
         self.groupe = groupe
         for col in range(1, 40): # range du nombre de colonnes de l'EDT
             for row in range(1, 30): # range du nombre de lignes de l'EDT
@@ -46,7 +46,7 @@ class EDT:
                     continue
 
                 if v.upper() == 'PT':
-                    self.sh.cell(column=col, row=row).value = 'PT - GROUPE {} - SEMAINE {}'.format(groupe, semaine)
+                    self.sh.cell(column=col, row=row).value = 'PT - GROUPE {} - SEMAINE {} - POSITION {}'.format(groupe, semaine, colle)
 
     def feed(self, groupe_id):
         groupe_id = groupe_id.replace('/', '-')
@@ -177,7 +177,7 @@ def fill_edt(groupes, path, folder, semaine_nb):
         groupe_id = semaine.groupe_id
         edt = EDT(path)
         edt.feed(groupe_id)
-        edt.me(groupe, semaine.colles[0].semaine) # On récupère le numéro de la semaine via la première colle du groupe
+        edt.me(groupe, semaine.colles[0].semaine, semaine.colles[0].colle_id) # On récupère le numéro de la semaine via la première colle du groupe
 
         ce = []
         for colle in semaine.colles:

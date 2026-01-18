@@ -65,7 +65,10 @@ class EmailSender:
             return True
 
         except Exception as e:
-            return askyesno('Mail', 'Une erreur s\'est produite en envoyant un mail.\nAdresse de récéption prévue:\n' + str(to) + '\nErreur:\n' + str(e) + '\nVoulez vous continuer ?')
+            print()
+            dialogs.warning('Une erreur s\'est produite en envoyant un mail.\nAdresse de récéption prévue:\n' + str(to) + '\nErreur:\n' + str(e) + '\nVoulez vous continuer ?')
+            ask = dialogs.question('Continuer ?', default = 'Oui').lower()[0] == 'o'
+            return ask
 
 
 def importExcelFile(path):
@@ -106,15 +109,9 @@ def importExcelFile(path):
 def AutoSendMail(table, files, semaine):
     ems = EmailSender()
     sujet = 'Emploi du temps semaine ' + str(semaine)
-    content = '''Coucou {name},
-Voici en pièce-jointe ton emploi du temps pour la semaine {semaine}.
-Normalement il tourne sur la dernière version du colloscope, mais mieux vaut jeter un rapide coup d'oeuil pour vérifier.
-S'il y a une erreur, il faut me le signaler !
-A plus,
-Benoit
-PS: j'ai mis à jour la journée de mardi selon les informations de Mme Aubry !
-Il faut juste vérifier pour certains d'entre vous qui ont colle avec elle.
-'''
+    f = open('template.txt', 'r', encoding = 'utf-8')
+    content = f.read()
+    f.close()
 
     n = 0
     l = 0
@@ -129,25 +126,33 @@ Il faut juste vérifier pour certains d'entre vous qui ont colle avec elle.
             n += 1
             pc = int(100 * n / l)
             vpc = int(20 * n / l)
-            print(' [' + '='*vpc + ' '*(20-vpc) + '] ' + str(pc) + ' %', end = '\r')
+            print(' [' + '='*vpc + ' '*(20-vpc) + '] ' + str(pc) + ' % ', nom, '    ', end = '\r')
 
             if not addr:
                 continue
 
-            ems.send(addr, sujet,
-                     content.format(name = nom, semaine = semaine),
-                     files = [fichier],)
+            r = ems.send(addr, sujet,
+                         content.format(name = nom, semaine = semaine),
+                         files = [fichier],)
+            if not r:
+                return
 
     print()
 
 
 if __name__ == '__main__':
-    #es = EmailSender()
-    #es.send('benoit.charreyron@orange.fr', 'Premier test !', 'Coucou, voici mon test pour envoyer par mail l\'EDT !', files = ['output/groupe-J.pdf'])
-    table = importExcelFile('emails.xlsx')
     fichiers = {l: f'output/groupe-{l}.pdf' for l in ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L']}
-    semaine = 16
-    AutoSendMail(table, fichiers, semaine)
+    print('premier mail')
+    es = EmailSender()
+    es.send('bravocharlie1273@orange.fr', 'Emplois du temps', 'Voici tous les emplois du temps.', files = list(fichiers.values()))
+
+    print('second mail')
+    es = EmailSender()
+    es.send('bravocharlie1273@orange.fr', 'Premier test !', 'Coucou, voici mon test pour envoyer par mail l\'EDT !', files = ['output/groupe-J.pdf'])
+    #table = importExcelFile('emails.xlsx')
+    #fichiers = {l: f'output/groupe-{l}.pdf' for l in ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L']}
+    #semaine = 16
+    #AutoSendMail(table, fichiers, semaine)
 
 
 

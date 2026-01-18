@@ -2,6 +2,7 @@ import excelparser
 import edtfiller
 import dialogs
 import config as confr
+import automail
 
 import os
 import sys
@@ -57,6 +58,7 @@ def create_edts():
     folder = dialogs.question('Lien vers le dossier de sortie', default = 'output/')
     r = edtfiller.fill_edt(groupes, excel_edt, folder, semaine)
     edtfiller.clear()
+
     if not r:
         return 0
 
@@ -64,6 +66,19 @@ def create_edts():
 
     #edtfiller.excel.Quit()
     #del edtfiller.excel
+
+def send_mail():
+    excel_file = dialogs.question('Lien vers le fichier Excel', default = 'emails.xlsx')
+    table = automail.importExcelFile(excel_file)
+    semaine = dialogs.question('Numéro de la semaine', type = int)
+    fichiers = {l: f'output/groupe-{l}.pdf' for l in ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L']}
+    automail.AutoSendMail(table, fichiers, semaine)
+    dialogs.text('Envoi automatique des fichiers à l\'adresse BC')
+    es = automail.EmailSender()
+    es.send('bravocharlie1273@orange.fr', 'Emplois du temps', 'Voici tous les emplois du temps.', files = list(fichiers.values()))
+
+    return 1
+
 
 def aide():
     dialogs.clear()
@@ -104,6 +119,7 @@ if __name__ == '__main__':
     actions = [
         (create_appel, 'Créer une feuille d\'appel'),
         (create_edts, 'Créer les emplois du temps pour une semaine'),
+        (send_mail, 'Envoyer les emplois du temps par mail'),
         (aide, 'Aide'),
         (quitter, 'Quitter'),
         ]
@@ -122,3 +138,5 @@ if __name__ == '__main__':
         action_id = dialogs.question('Choix', default = len(actions))
         fnct = actions[int(action_id)-1][0]
         e = fnct()
+        print()
+        dialogs.question('Programme terminé')
