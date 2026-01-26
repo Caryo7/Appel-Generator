@@ -1,6 +1,0 @@
-Coucou {name},
-Voici en pièce-jointe ton emploi du temps pour la semaine {semaine}.
-Normalement il tourne sur la dernière version du colloscope, mais mieux vaut jeter un rapide coup d'oeuil pour vérifier.
-S'il y a une erreur, il faut me le signaler !
-A plus,
-Benoit

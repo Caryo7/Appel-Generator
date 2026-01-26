@@ -8,6 +8,19 @@ import os
 import sys
 from pathlib import Path
 
+def find_latest_week(folder):
+    p = Path(folder)
+    zips = list(p.glob('**/*.zip'))
+    numbers = []
+    for z in zips:
+        z = str(z).split('-')[-1]
+        z = z.replace('.zip', '')
+        z = z.replace('S', '')
+        z = int(z)
+        numbers.append(z)
+
+    return max(numbers) + 1
+
 def ask_config():
     dialogs.clear()
     p = Path('config/')
@@ -55,7 +68,7 @@ def create_edts():
     thistable = excelparser.selector(table, semaine)
     groupes = excelparser.sort_groupes(thistable)
     excel_edt = dialogs.question('Lien vers le fichier Excel EDT', default = 'EDT-PT.xlsx')
-    folder = dialogs.question('Lien vers le dossier de sortie', default = 'output/')
+    folder = dialogs.question('Lien vers le dossier de sortie', default = config.output_path)
     r = edtfiller.fill_edt(groupes, excel_edt, folder, semaine)
     edtfiller.clear()
 
@@ -68,47 +81,87 @@ def create_edts():
     #del edtfiller.excel
 
 def send_mail():
-    excel_file = dialogs.question('Lien vers le fichier Excel', default = 'emails.xlsx')
-    table = automail.importExcelFile(excel_file)
+    config = ask_config()
+
+    emails_file = dialogs.question('Lien vers les adresses mails', default = config.emails_file)
+    colloscope_file = dialogs.question('Lien vers le colloscope', default = config.input_file)
+    output_folder = dialogs.question('Dossier de sortie', default = config.output_path)
+    table = automail.importExcelFile(emails_file)
     semaine = dialogs.question('Numéro de la semaine', type = int)
-    fichiers = {l: f'output/groupe-{l}.pdf' for l in ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L']}
-    automail.AutoSendMail(table, fichiers, semaine)
+    table_colles = excelparser.read_colloscope(colloscope_file, config)
+    thistable = excelparser.selector(table_colles, semaine)
+    infos = {}
+    for colle in thistable:
+        if colle.groupe not in infos:
+            infos[colle.groupe] = []
+
+        infos[colle.groupe].append((colle.salle, colle.heure, colle.jour, colle.prof, colle.colle_id))
+
+    groupes = list(infos.keys())
+    fichiers = {l: output_folder + f'groupe-{l}.pdf' for l in groupes}
+    automail.AutoSendMail(table, fichiers, semaine, infos)
     dialogs.text('Envoi automatique des fichiers à l\'adresse BC')
     es = automail.EmailSender()
     es.send('bravocharlie1273@orange.fr', 'Emplois du temps', 'Voici tous les emplois du temps.', files = list(fichiers.values()))
 
     return 1
 
+def general():
+    config = ask_config()
+    output_folder = dialogs.question('Dossier de sortie', default = config.output_path)
+    week = find_latest_week(output_folder)
+    semaine = dialogs.question('Numéro de la semaine', type = int, default = week)
+    emails_file = dialogs.question('Adresses mails', default = config.emails_file)
+    colloscope_file = dialogs.question('Colloscope', default = config.input_file)
+    excel_edt = dialogs.question('Emplois du temps', default = config.edt_path)
+    template = dialogs.question('Template mail (TXT)', default = config.template_file)
+    template_edt = dialogs.question('Template mail (EDT)', default = config.template_edt)
+    template_appels = dialogs.question('Template mail (Appels)', default = config.template_appels)
+    appel_file = dialogs.question('Feuille d\'appel', default = config.output_file)
+    modif_file = dialogs.question('Modification de dernière minute', default = config.modif_file)
+    table_addr, table_edt, table_appels = automail.importExcelFile(emails_file)
 
-def aide():
-    dialogs.clear()
-    dialogs.text('Aide')
-    dialogs.text("Utilisation des feuilles d'appel")
-    dialogs.text("""Le principe des feuilles d'appel est de permettre de créer
-la liste des élèves dans chaque groupes.
-Pour cela, démarrez l'outil de création de feuille d'appel depuis le menu
-principal et suivez les instructions.
-Le programme vous demande une configuration. Choisissez en une parmis celles
-proposées. Les configurations doivent être enregistrées dans le dossier config.
+    table = excelparser.read_colloscope(colloscope_file, config)
+    thistable = excelparser.selector(table, semaine)
+    thistable = excelparser.read_modifs(modif_file, thistable)
 
-Le programme charge la personnalisation et vous demande des informations.
-Choisissez un fichier : par défaut il est enregistrer dans la configuration.
-Si la proposition bleu foncée vous convient, ne tapez rien et faites Entrée.
-Vous pouvez aussi écrire un autre nom (chemin absolu ou relatif au programme).
+    groupes = excelparser.sort_groupes(thistable)
+    r = edtfiller.fill_edt(groupes, excel_edt, output_folder, semaine)
+    edtfiller.clear()
 
-On vous demande ensuite le fichier de sortie des feuilles d'appel. Sur le
-même principe, vous pouvez changer le fichier.
+    weeks = excelparser.all_weeks(table)
+    tables = {}
+    for _semaine in weeks:
+        _thistable = excelparser.selector(table, _semaine)
+        tables[_semaine] = _thistable
 
-Choisissez ensuite la semaine en cours à analyser. Le programme lira uniquement
-la colonne correspondante pour vous faire les listes d'appel de la semaine.
+    app = excelparser.appel(tables, appel_file, config, semaine)
 
-Le programme tourne alors seul et génère le fichier de sortie.
-Il vous propose de l'ouvrir directement à la fin de la création. Répondez par
-oui ou non.
+    os.system(output_folder.replace('/', '\\') + f'output-S' + str(semaine) + '.zip')
+    dialogs.question("\n\nFin de la génération. Validez pour continuer l'envoi des mails", default = '')
 
-Le fichier peut alors être ouvert. Le programme retourne au menu principal""")
-    dialogs.end()
-    return 1
+    infos = {}
+    for colle in thistable:
+        if colle.groupe not in infos:
+            infos[colle.groupe] = []
+
+        infos[colle.groupe].append((colle.salle, colle.heure, colle.jour, colle.prof, colle.colle_id))
+
+    groupes_mail = list(infos.keys())
+    fichiers = {l: output_folder + f'groupe-{l}.pdf' for l in groupes_mail}
+    dialogs.text("\nEnvoi automatique de tous les emplois du temps")
+    automail.send_edt(list(fichiers.values()), table_edt, template_edt, semaine)
+    dialogs.text("\nEnvoi automatique de toutes les feuilles d'appel")
+    automail.send_edt([appel_file.replace('.xlsx', '.pdf')], table_appels, template_appels, semaine)
+
+    dialogs.text("\nEnvoi automatique de tous les emplois du temps")
+    automail.AutoSendMail(table_addr, fichiers, semaine, infos, template)
+    #es = automail.EmailSender()
+    #es.send('bravocharlie1273@orange.fr', 'Emplois du temps', 'Voici tous les emplois du temps.', files = list(fichiers.values()), test = False)
+    #es.send('bravocharlie1273@orange.fr', 'Feuilles d\'appel', 'Voici toutes les feuilles pour les appels.', files = [appel_file.replace('.xlsx', '.pdf')], test = False)
+
+    return -1
+
 
 def quitter():
     return -1
@@ -117,10 +170,10 @@ if __name__ == '__main__':
     dialogs.clear()
     dialogs.text('''Programme de gestion du colloscope''')
     actions = [
+        (general, 'Programme principal'),
         (create_appel, 'Créer une feuille d\'appel'),
         (create_edts, 'Créer les emplois du temps pour une semaine'),
         (send_mail, 'Envoyer les emplois du temps par mail'),
-        (aide, 'Aide'),
         (quitter, 'Quitter'),
         ]
 
@@ -135,8 +188,8 @@ if __name__ == '__main__':
             dialogs.item(i+1, title)
 
         dialogs.text()
-        action_id = dialogs.question('Choix', default = len(actions))
+        action_id = dialogs.question('Choix', default = 1)
         fnct = actions[int(action_id)-1][0]
         e = fnct()
         print()
-        dialogs.question('Programme terminé')
+        dialogs.question('Programme terminé', default = '')

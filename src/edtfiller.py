@@ -1,14 +1,11 @@
 import openpyxl as xl
 import os
 from zipfile import *
-from win32com.client import DispatchEx
 from pathlib import Path
 from datetime import datetime
 
+import excelsaver
 import dialogs
-
-excel = DispatchEx('Excel.Application')
-excel.Visible = 0
 
 # A ce stade, on a de quoi extraire le colloscope du fichier excel.
 # On peut récupérer la liste des colles de chaque groupes, et leur POSIX
@@ -104,12 +101,7 @@ class EDT:
         #    dialogs.warning("Erreur d'enregistrement, fichier ouvert (cf processus arrière plan)")
 
         #try:
-        wb = excel.Workbooks.Open(fp + '.xlsx')
-        wb.application.displayalerts = False
-        ws = wb.Worksheets[0]
-        ws.SaveAs(fp + '.pdf', FileFormat=57)
-        wb.Close()
-
+        return excelsaver.export_pdf(fp + '.xlsx')
         #except:
             #dialogs.warning("Erreur sur l'exportation, recommencez en fermant tout !")
             #excel.Quit()
@@ -117,7 +109,7 @@ class EDT:
 
             #return False
 
-        return fp + '.pdf'
+        #return fp + '.pdf'
 
 def import_edt(path):
     """Ouvre l'emploi du temps des élèves, et en fait une "copie"
@@ -183,10 +175,10 @@ def fill_edt(groupes, path, folder, semaine_nb):
         for colle in semaine.colles:
             r = edt.fill(colle)
             if not r:
-                ce.append(str(colle))
+                ce.append(f'{str(colle)}, {colle.jour}, {colle.heure}, {colle.prof}, {colle.salle}')
 
         if ce:
-            dialogs.warning('Une ou plusieurs colle indéterminées !', ', '.join(ce), '\n')
+            dialogs.warning('Colision de colles !', ', '.join(ce), '\n')
 
         r = edt.export(folder)
         if not r:

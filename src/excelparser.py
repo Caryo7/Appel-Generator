@@ -2,7 +2,7 @@
 ## Programme écrit par Benoit Charreyron
 ## Copyright 2025
 ## MIT License
-## Fichier principal de traitement
+## Fichier principal de traitement interne
 
 from pathlib import Path
 from openpyxl.styles import PatternFill
@@ -11,8 +11,10 @@ import openpyxl as xl
 import sys
 import os
 
-import config as confr# On utilise le fichier config du dossier
+import config as confr # On utilise le fichier config du dossier
 import dialogs
+import edtfiller
+import excelsaver
 
 class Colle:
     # Attributs de la classe (fixe pour chaque colle)
@@ -38,6 +40,19 @@ class Colle:
                  groupe,
                  colle_id,
                  ):
+        """Initialisation de la classe colle.
+        Arguments
+        * salle : la salle de la colle
+        * heure : l'heure de la colle
+        * jour : le jour dans la semaine de la colle
+        * semaine : le numéro de semaine de la colle
+        * prof : le professeur qui fait la colle
+        * groupe : le groupe qui suit la colle
+        * colle_id : l'identifiant de la colle (et du groupe cette semaine là)
+
+        Retourne
+        * Colle : la colle
+        """
 
         self.salle = salle
         self.heure = heure
@@ -69,19 +84,19 @@ def read_colloscope(path, config):
     # Section ouverture du fichier excel
 
     wb = xl.load_workbook(path)
-    #sh = wb.active
-    act = 0
-    dialogs.text('Le fichier {} comporte plusieurs feuilles'.format(path))
-    for i, name in enumerate(wb.sheetnames):
-        star = ''
-        if wb.active.title == name:
-            act = i+1
-            star = '*'
+    sh = dialogs.ask_feuille(wb, path)
+    #act = 0
+    #dialogs.text('Le fichier {} comporte plusieurs feuilles'.format(path))
+    #for i, name in enumerate(wb.sheetnames):
+    #    star = ''
+    #    if wb.active.title == name:
+    #        act = i+1
+    #        star = '*'
 
-        dialogs.item(i+1, name, star)
+    #    dialogs.item(i+1, name, star)
 
-    chx = dialogs.question('Quelle feuille voulez vous utiliser ?', act)
-    sh = wb[wb.sheetnames[int(chx)-1]]
+    #chx = dialogs.question('Quelle feuille voulez vous utiliser ?', act)
+    #sh = wb[wb.sheetnames[int(chx)-1]]
 
     # Section lecture de la liste des élèves
     groupes = {}
@@ -205,6 +220,102 @@ def selector(table, semaine):
             
     return extraction
 
+def find_colle_id(table, groupe):
+    """Cette fonction retourne l'identifiant
+    du groupe de colle en à partir d'un nom de groupe
+    et d'une table de groupes pour une semaine
+
+    Arguments
+    * table : la table des colles de la semaine
+    * groupe : le groupe dont on cherche l'identifiant
+
+    Retourne
+    * colle_id : identifiant de colle si trouvée, None sinon
+    """
+
+    for colle in table:
+        if colle.groupe.lower() == groupe.lower():
+            return colle.colle_id
+
+def read_modifs(modif_file, table):
+    """Cette fonction sert à modifier le colloscope principal
+    en changeant des colles et/ou en ajoutant / supprimant.
+    Cela permet de manipuler la dernière semaine
+
+    Arguments
+    * modif_file : le chemin du fichier contenant les modifications
+                   (qui doit être sur une seule semaine (après selector)
+    * table : la table principale des groupes
+
+    Retourne
+    * table : table principal qui a été modifiée
+    """
+
+    wb = xl.load_workbook(modif_file)
+    sh = dialogs.ask_feuille(wb, modif_file)
+
+    ## Formatage
+    # Colonne 1 : Groupe
+    # Colonne 2 : Jour
+    # Colonne 3 : Heure
+    # Colonne 4 : Professeur
+    # Colonne 5 : Salle
+    # Première ligne : 2
+
+    modifs = []
+    row = 1
+    colle_id = None
+    semaine = table[0].semaine
+
+    while sh.cell(row = row+1, column = 1).value:
+        row += 1
+        groupe = sh.cell(row = row, column = 1).value
+        jour = sh.cell(row = row, column = 2).value
+        heure = sh.cell(row = row, column = 3).value
+        prof = sh.cell(row = row, column = 4).value
+        room = sh.cell(row = row, column = 5).value
+
+        kolle = Colle(room, heure.lower(), jour, semaine, prof, groupe, colle_id)
+        modifs.append(kolle)
+
+    output_table = []
+    used = []
+    for colle_org in table:
+        updated = False
+        for colle_mod in modifs:
+            if colle_mod in used:
+                continue
+
+            if colle_org.jour.lower() != colle_mod.jour.lower():
+                continue
+
+            if not edtfiller.dt(colle_org.heure.lower(), colle_mod.heure.lower()):
+                continue
+
+            if colle_org.groupe.lower() != colle_mod.groupe.lower():
+                continue
+
+            colle_org.salle = colle_mod.salle
+            colle_org.prof = colle_mod.prof
+            output_table.append(colle_org)
+            used.append(colle_mod)
+            updated = True
+
+        if not updated:
+            output_table.append(colle_org)
+
+
+    for colle_mod in modifs:
+        if colle_mod in used:
+            continue
+
+        colle_id = find_colle_id(table, colle_mod.groupe)
+        colle_mod.colle_id = colle_id
+        output_table.append(colle_mod)
+
+    return output_table
+
+
 class Week:
     def __init__(self, groupe_id):
         self.groupe_id = groupe_id # = colle_id
@@ -217,7 +328,7 @@ class Week:
         return '{groupe_id}-{nbcolle}'.format(
             groupe_id = self.groupe_id,
             nbcolle = len(self.colles))
-        
+
 
 def sort_groupes(table):
     """Cette fonction prend une table sur une semaine uniquement !
@@ -267,13 +378,16 @@ def sort_profs(table):
             
     return profs
 
-def appel(tables, path, config):
+def appel(tables, path, config, week = None):
     """Création d'une feuille d'appel pour chaque groupes pour chaque
     semaine. Cela utilise une table sur une semaine !
 
     Arguments
     * tables : un dictionnaire de table, une table par semaine
     * path  : fichier excel à générer
+    * config : le fichier de configuration des feuilles
+    * week : optionnel pour indiquer une semaine en particulier.
+             Si semaine est donné, il n'y aura que la feuille en question !
 
     Retourne
     Rien
@@ -286,17 +400,30 @@ def appel(tables, path, config):
     font_title = Font(bold = True)
     fill_student = PatternFill()#start_color='bad9ff', end_color='bad9ff', fill_type="solid")
     fill_title = PatternFill()#start_color='bad9ff', end_color='bad9ff', fill_type="solid")
+    sheet_layout = config.layout
 
     for semaine, table in tables.items():
-        sh = wb.create_sheet('Semaine-{}'.format(semaine))
-        data = {i: [] for i in range(len(feuilles))}
+        if week != semaine and week is not None:
+            continue
 
+        sh = wb.create_sheet('Semaine-{}'.format(semaine))
+        sh.cell(row = 1, column = 1).value = 'Appel semaine ' + str(semaine)
+        sh.cell(row = 1, column = 1).font = font_title
+        sh.cell(row = 1, column = 1).fill = fill_title
+        sh.page_margins.left = 1
+        sh.page_margins.right = 1
+        sh.page_margins.top = 1
+        sh.page_margins.bottom = 1
+        sh.sheet_properties.pageSetUpPr.fitToPage = True
+
+        data = {i: [] for i in range(len(feuilles))}
         for colle in table:
             for i, sheet in enumerate(feuilles):
                 if colle.colle_id in sheet[0]:
                     data[i].append(colle)
 
         extract = {}
+        eleves = []
         for i, colles in data.items():
             extract[i] = []
             for colle in colles:
@@ -306,25 +433,27 @@ def appel(tables, path, config):
                 for eleve in colle.eleves:
                     if eleve not in extract[i]:
                         extract[i].append(eleve)
+                        if len(eleve) not in eleves:
+                            eleves.append(len(eleve))
 
         for k in extract:
-            extract[k].sort()
+            extract[k].sort() # Tri alphabétique des noms dans la feuille d'appel
 
-        col = 1
         for i, (_, title) in enumerate(feuilles):
-            sh.cell(row = 1, column = col).value = title
-            sh.cell(row = 1, column = col).font = font_title
-            sh.cell(row = 1, column = col).fill = fill_title
-            l = len(title)
+            col, row_base = sheet_layout[i]
+            sh.cell(row = row_base, column = col).value = title
+            sh.cell(row = row_base, column = col).font = font_title
+            sh.cell(row = row_base, column = col).fill = fill_title
 
             for line, student in enumerate(extract[i]):
-                sh.cell(row = line + 3, column = col).value = student
-                sh.cell(row = line + 3, column = col).font = font_student
-                sh.cell(row = line + 3, column = col).fill = fill_student
-                l = max(l, len(student))
+                sh.cell(row = line + row_base + 1, column = col).value = student
+                sh.cell(row = line + row_base + 1, column = col).font = font_student
+                sh.cell(row = line + row_base + 1, column = col).fill = fill_student
 
-            sh.column_dimensions[chr(col+64)].width = l * 1.2
-            col += 2
+            sh.column_dimensions[chr(col+64)].width = max(eleves + [len(title)]) * 1.2
 
     wb.save(path)
+
+    if week is not None or 1:
+        excelsaver.export_pdf(os.path.abspath(path))
 

@@ -1,0 +1,10 @@
+Coucou {name},
+Voici en pièce jointe ton emploi du temps pour la semaine {semaine}. Tu seras en position {position} pour mardi.
+Normalement, le programme tourne sur la dernière version du colloscope, mais mieux vaut jeter un rapide coup d'œil pour vérifier.
+S'il y a une erreur, il faut me le signaler !
+Voici un recap des colles
+{colles}
+
+A plus,
+Benoit
+PS. La dernière version du programme peut prendre en charge les modifications et reports de colle, il suffit de me le dire et j'intègre ça à ton emploi du temps ! :)

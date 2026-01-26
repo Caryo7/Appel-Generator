@@ -8,7 +8,9 @@ import openpyxl as xl
 from pathlib import Path
 from configparser import ConfigParser
 import dialogs
+import time
 
+TEST_MODE = False
 
 class EmailSender:
     def reload_sender(self):
@@ -18,7 +20,7 @@ class EmailSender:
         self.password_email = parser.get('mail', 'password')
         self.server = 'smtp.' + self.sender_email.split('@')[1]
 
-    def send(self, to, subject, text, files = []):
+    def send(self, to, subject, text, files = [], test = True):
         self.reload_sender()
 
         try:
@@ -57,6 +59,16 @@ class EmailSender:
             text = message.as_string()
 
             # Log in to server using secure context and send email
+            if TEST_MODE or test:
+                dialogs.info('Simulation envoi...', end = '')
+                time.sleep(0.3)
+                f = open(f'temp-emails/{to}-{time.time()}.eml', 'w', encoding = 'utf-8')
+                f.write(text)
+                f.close()
+                return True
+            else:
+                dialogs.info('                   ', end = '')
+
             context = ssl.create_default_context()
             with smtplib.SMTP_SSL(self.server, 465, context=context) as server:
                 server.login(self.sender_email, self.password_email)
@@ -73,43 +85,73 @@ class EmailSender:
 
 def importExcelFile(path):
     wb = xl.load_workbook(path)
-    dialogs.text('Le fichier {} comporte plusieurs feuilles'.format(path))
-    for i, name in enumerate(wb.sheetnames):
-        star = ''
-        if wb.active.title == name:
-            act = i+1
-            star = '*'
+    out = []
+    for i, title in enumerate(['élèves', 'emplois du temps', 'appels']):
+        dialogs.text('Email pour les', title)
+        sh = dialogs.ask_feuille(wb, path, default = i)
 
-        dialogs.item(i+1, name, star)
+        ## Formatage :
+        # Colonne A : groupe
+        # Colonne B : nom
+        # Colonne C : adresse Email
 
-    chx = dialogs.question('Quelle feuille voulez vous utiliser ?', act)
-    sh = wb[wb.sheetnames[int(chx)-1]]
+        row = 2
+        table = {}
+        groupe = None
+        while sh.cell(row = row, column = 2).value:
+            if i == 0:
+                grp = sh.cell(row = row, column = 1).value
+                if grp:
+                    groupe = grp
+                    table[groupe] = []
 
-    ## Formatage :
-    # Colonne A : groupe
-    # Colonne B : nom
-    # Colonne C : adresse Email
+                nom = sh.cell(row = row, column = 2).value
+                addr = sh.cell(row = row, column = 3).value
+                table[groupe].append((nom, addr))
 
-    row = 2
-    table = {}
-    groupe = None
-    while sh.cell(row = row, column = 2).value:
-        grp = sh.cell(row = row, column = 1).value
-        if grp:
-            groupe = grp
-            table[groupe] = []
+            else:
+                nom = sh.cell(row = row, column = 1).value
+                addr = sh.cell(row = row, column = 2).value
+                table[addr] = nom
 
-        nom = sh.cell(row = row, column = 2).value
-        addr = sh.cell(row = row, column = 3).value
-        table[groupe].append((nom, addr))
-        row += 1
+            row += 1
 
-    return table
+        out.append(table)
 
-def AutoSendMail(table, files, semaine):
+    return out
+
+def autoformat(message, variables):
+    for k, v in variables.items():
+        message = message.replace('{' + str(k) + '}', str(v))
+
+    return message
+
+def ligne_colle(infos):
+    txt = ''
+    for salle, heure, jour, prof, groupe in infos:
+        txt += f' - {prof} {jour.lower()} à {heure} en {salle}\n'
+
+    return txt
+
+def send_edt(fichiers, table_out, template, semaine):
+    ems = EmailSender()
+    sujet = 'Emplois du temps semaine ' + str(semaine)
+    f = open(template, 'r', encoding = 'utf-8')
+    content = f.read()
+    f.close()
+
+    for addr, civilite in table_out.items():
+        ems.send(addr, sujet,
+                 autoformat(content, {'civilite': civilite,
+                                      'semaine': semaine,}),
+                 files = fichiers,
+                 test = False,
+                 )
+
+def AutoSendMail(table, files, semaine, infos, template):
     ems = EmailSender()
     sujet = 'Emploi du temps semaine ' + str(semaine)
-    f = open('template.txt', 'r', encoding = 'utf-8')
+    f = open(template, 'r', encoding = 'utf-8')
     content = f.read()
     f.close()
 
@@ -119,21 +161,38 @@ def AutoSendMail(table, files, semaine):
     for _, eleves in table.items():
         l += len(eleves)
 
-    import time
+    ask = dialogs.question('Confirmez la désactivation du mode de test ?', prompt = '[OUI/NON -> NON] >>> ', default = 'NON')
+    if ask != 'OUI':
+        TEST = True
+    else:
+        TEST = False
+
     for groupe, eleves in table.items():
         fichier = files[groupe]
+        info = infos[groupe]
         for nom, addr in eleves:
             n += 1
             pc = int(100 * n / l)
             vpc = int(20 * n / l)
-            print(' [' + '='*vpc + ' '*(20-vpc) + '] ' + str(pc) + ' % ', nom, '    ', end = '\r')
+            dialogs.text(' [', '='*vpc, ' '*(20-vpc), '] ', str(pc), ' % ', nom, end = ' ', sep = '')
 
+            this_test = TEST
             if not addr:
-                continue
+                this_test = True
+                dialogs.warning('NO-MAIL! ', end = '')
 
             r = ems.send(addr, sujet,
-                         content.format(name = nom, semaine = semaine),
-                         files = [fichier],)
+                         autoformat(content, {'name': nom,
+                                              'semaine': semaine,
+                                              'colles': ligne_colle(info),
+                                              'position': info[0][-1]}),
+
+                         files = [fichier],
+                         test = this_test,
+                         )
+
+            print('\r', end = '')
+
             if not r:
                 return
 
@@ -141,7 +200,8 @@ def AutoSendMail(table, files, semaine):
 
 
 if __name__ == '__main__':
-    fichiers = {l: f'output/groupe-{l}.pdf' for l in ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L']}
+    lettres = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L']
+    fichiers = {l: f'output/groupe-{l}.pdf' for l in lettres}
     print('premier mail')
     es = EmailSender()
     es.send('bravocharlie1273@orange.fr', 'Emplois du temps', 'Voici tous les emplois du temps.', files = list(fichiers.values()))
