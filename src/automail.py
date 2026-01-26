@@ -204,11 +204,11 @@ if __name__ == '__main__':
     fichiers = {l: f'output/groupe-{l}.pdf' for l in lettres}
     print('premier mail')
     es = EmailSender()
-    es.send('bravocharlie1273@orange.fr', 'Emplois du temps', 'Voici tous les emplois du temps.', files = list(fichiers.values()))
+    es.send('', 'Emplois du temps', 'Voici tous les emplois du temps.', files = list(fichiers.values()))
 
     print('second mail')
     es = EmailSender()
-    es.send('bravocharlie1273@orange.fr', 'Premier test !', 'Coucou, voici mon test pour envoyer par mail l\'EDT !', files = ['output/groupe-J.pdf'])
+    es.send('', 'Premier test !', 'Coucou, voici mon test pour envoyer par mail l\'EDT !', files = ['output/groupe-J.pdf'])
     #table = importExcelFile('emails.xlsx')
     #fichiers = {l: f'output/groupe-{l}.pdf' for l in ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L']}
     #semaine = 16
