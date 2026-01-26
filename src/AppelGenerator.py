@@ -102,7 +102,7 @@ def send_mail():
     automail.AutoSendMail(table, fichiers, semaine, infos)
     dialogs.text('Envoi automatique des fichiers à l\'adresse BC')
     es = automail.EmailSender()
-    es.send('bravocharlie1273@orange.fr', 'Emplois du temps', 'Voici tous les emplois du temps.', files = list(fichiers.values()))
+    es.send('', 'Emplois du temps', 'Voici tous les emplois du temps.', files = list(fichiers.values()))
 
     return 1
 
@@ -157,8 +157,8 @@ def general():
     dialogs.text("\nEnvoi automatique de tous les emplois du temps")
     automail.AutoSendMail(table_addr, fichiers, semaine, infos, template)
     #es = automail.EmailSender()
-    #es.send('bravocharlie1273@orange.fr', 'Emplois du temps', 'Voici tous les emplois du temps.', files = list(fichiers.values()), test = False)
-    #es.send('bravocharlie1273@orange.fr', 'Feuilles d\'appel', 'Voici toutes les feuilles pour les appels.', files = [appel_file.replace('.xlsx', '.pdf')], test = False)
+    #es.send('', 'Emplois du temps', 'Voici tous les emplois du temps.', files = list(fichiers.values()), test = False)
+    #es.send('', 'Feuilles d\'appel', 'Voici toutes les feuilles pour les appels.', files = [appel_file.replace('.xlsx', '.pdf')], test = False)
 
     return -1
 
