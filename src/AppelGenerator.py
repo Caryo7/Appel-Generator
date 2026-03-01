@@ -1,6 +1,7 @@
 import excelparser
 import edtfiller
 import dialogs
+from configparser import *
 import config as confr
 import automail
 
@@ -8,35 +9,51 @@ import os
 import sys
 from pathlib import Path
 
+class Semaine:
+    def __init__(self, numero):
+        self.me = numero
+        self.DS = 'A'
+
+    def __repr__(self):
+        return self.me
+
+    def __str__(self):
+        return str(self.me)
+
+    def __int__(self):
+        return int(self.me)
+
+    def __eq__(self, nb):
+        return nb == self.me
+
+# Récupération du nom de la dernière semaine à partir du dernier fichier ZIP généré
 def find_latest_week(folder):
+    """Scanne le répertoire courant et retourne
+    le plus grand chiffre contenu dans le nom d'un fichier.
+
+    Entrée
+    * folder: dossier à observer
+
+    Retourne
+    * chiffre le plus grand
+    """
+
+    # Scan du dossier des fichier ZIP
     p = Path(folder)
     zips = list(p.glob('**/*.zip'))
     numbers = []
     for z in zips:
+        # Récupération du nom de la semaine
         z = str(z).split('-')[-1]
         z = z.replace('.zip', '')
         z = z.replace('S', '')
         z = int(z)
-        numbers.append(z)
+        numbers.append(z) # Ajout du nombre
 
-    return max(numbers) + 1
-
-def ask_config():
-    dialogs.clear()
-    p = Path('config/')
-    dialogs.text('Bienvenue, veuillez choisir une configuration')
-    config_files = list(p.glob('**/*.ini'))
-    for i, fp in enumerate(config_files):
-        dialogs.item(i+1, fp.name)
-
-    item = dialogs.question()
-    config_file = config_files[int(item)-1]
-    config = confr.Configuration(config_file)
-
-    return config
+    return max(numbers) + 1 # On prendra par défaut la semaine suivante
 
 def create_appel():
-    config = ask_config()
+    config = dialogs.ask_config()
 
     excel_file = dialogs.question('Lien vers le fichier Excel', default = config.input_file)
     output_file = dialogs.question('Fichier Excel de sortie', default = config.output_file)
@@ -60,11 +77,11 @@ def create_appel():
     return 1
 
 def create_edts():
-    config = ask_config()
+    config = dialogs.ask_config()
 
     excel_file = dialogs.question('Lien vers le fichier Excel', default = config.input_file)
     table = excelparser.read_colloscope(excel_file, config)
-    semaine = dialogs.question('Semaine à générer', type = int)
+    semaine = Semaine(dialogs.question('Semaine à générer', type = int))
     thistable = excelparser.selector(table, semaine)
     groupes = excelparser.sort_groupes(thistable)
     excel_edt = dialogs.question('Lien vers le fichier Excel EDT', default = 'EDT-PT.xlsx')
@@ -81,13 +98,13 @@ def create_edts():
     #del edtfiller.excel
 
 def send_mail():
-    config = ask_config()
+    config = dialogs.ask_config()
 
     emails_file = dialogs.question('Lien vers les adresses mails', default = config.emails_file)
     colloscope_file = dialogs.question('Lien vers le colloscope', default = config.input_file)
     output_folder = dialogs.question('Dossier de sortie', default = config.output_path)
     table = automail.importExcelFile(emails_file)
-    semaine = dialogs.question('Numéro de la semaine', type = int)
+    semaine = Semaine(dialogs.question('Numéro de la semaine', type = int))
     table_colles = excelparser.read_colloscope(colloscope_file, config)
     thistable = excelparser.selector(table_colles, semaine)
     infos = {}
@@ -106,11 +123,13 @@ def send_mail():
 
     return 1
 
-def general():
-    config = ask_config()
+def general(config = None):
+    if not config:
+        config = dialogs.ask_config()
+
     output_folder = dialogs.question('Dossier de sortie', default = config.output_path)
     week = find_latest_week(output_folder)
-    semaine = dialogs.question('Numéro de la semaine', type = int, default = week)
+    semaine = Semaine(dialogs.question('Numéro de la semaine (Attention aux vacances !)', type = int, default = week))
     emails_file = dialogs.question('Adresses mails', default = config.emails_file)
     colloscope_file = dialogs.question('Colloscope', default = config.input_file)
     excel_edt = dialogs.question('Emplois du temps', default = config.edt_path)
@@ -122,18 +141,22 @@ def general():
     table_addr, table_edt, table_appels = automail.importExcelFile(emails_file)
 
     table = excelparser.read_colloscope(colloscope_file, config)
+    semaine.DS = excelparser.get_this_ds(colloscope_file, config, semaine)
     thistable = excelparser.selector(table, semaine)
     thistable = excelparser.read_modifs(modif_file, thistable)
+    if thistable is None:
+        dialogs.warning(f"La semaine {semaine} n'existe pas ! Attention aux vacances !")
+        return -1
 
     groupes = excelparser.sort_groupes(thistable)
-    r = edtfiller.fill_edt(groupes, excel_edt, output_folder, semaine)
+    r = edtfiller.fill_edt(groupes, excel_edt, output_folder, semaine, table_addr, config)
     edtfiller.clear()
 
     weeks = excelparser.all_weeks(table)
     tables = {}
     for _semaine in weeks:
         _thistable = excelparser.selector(table, _semaine)
-        tables[_semaine] = _thistable
+        tables[int(_semaine)] = _thistable
 
     app = excelparser.appel(tables, appel_file, config, semaine)
 
@@ -148,7 +171,11 @@ def general():
         infos[colle.groupe].append((colle.salle, colle.heure, colle.jour, colle.prof, colle.colle_id))
 
     groupes_mail = list(infos.keys())
-    fichiers = {l: output_folder + f'groupe-{l}.pdf' for l in groupes_mail}
+    fichiers = {}
+    for grp, people in table_addr.items():
+        for nom, family, _, _, _ in people:
+            fichiers[(nom, family)] = output_folder + f'groupe-{grp}-{nom}.{family}.pdf'
+
     dialogs.text("\nEnvoi automatique de tous les emplois du temps")
     automail.send_edt(list(fichiers.values()), table_edt, template_edt, semaine)
     dialogs.text("\nEnvoi automatique de toutes les feuilles d'appel")
@@ -156,20 +183,17 @@ def general():
 
     dialogs.text("\nEnvoi automatique de tous les emplois du temps")
     automail.AutoSendMail(table_addr, fichiers, semaine, infos, template)
-    #es = automail.EmailSender()
-    #es.send('', 'Emplois du temps', 'Voici tous les emplois du temps.', files = list(fichiers.values()), test = False)
-    #es.send('', 'Feuilles d\'appel', 'Voici toutes les feuilles pour les appels.', files = [appel_file.replace('.xlsx', '.pdf')], test = False)
-
     return -1
 
 
 def quitter():
     return -1
 
-if __name__ == '__main__':
+def htest():
+    # Programme principal
     dialogs.clear()
     dialogs.text('''Programme de gestion du colloscope''')
-    actions = [
+    actions = [ # Actions disponibles
         (general, 'Programme principal'),
         (create_appel, 'Créer une feuille d\'appel'),
         (create_edts, 'Créer les emplois du temps pour une semaine'),
@@ -177,6 +201,7 @@ if __name__ == '__main__':
         (quitter, 'Quitter'),
         ]
 
+    # On continue tant que la commande d'arrêt n'est pas déclenchée
     e = 0
     while e >= 0:
         if e == 1:
@@ -188,8 +213,17 @@ if __name__ == '__main__':
             dialogs.item(i+1, title)
 
         dialogs.text()
+        # Choix d'une action
         action_id = dialogs.question('Choix', default = 1)
         fnct = actions[int(action_id)-1][0]
+        # Lancement de la fonction
         e = fnct()
         print()
         dialogs.question('Programme terminé', default = '')
+
+if __name__ == '__main__':
+    parser = ConfigParser()
+    parser.read('config/intern.ini', encoding = 'utf-8')
+    run = parser.get('sequence', 'run').split(';')
+    for config in run:
+        general(confr.Configuration(config))
