@@ -2,6 +2,18 @@ from configparser import *
 
 class Configuration:
     def _import(self, section, option, type = int):
+        """Fonction d'importation des données d'une section/option
+        Utilise une fonction de conversion type pour appliquer un réglage
+        sur la valeur. Si il y a erreur, retourne une chaine de caractères
+        Arguments
+        * section: section du fichier de configuration
+        * option: option dans la section
+        * type: fonction lambda par exemple
+
+        Retourne
+        * valeur: sous type ou str
+        """
+
         data = self.parser.get(section, option)
         try:
             return type(data)
@@ -9,6 +21,18 @@ class Configuration:
             return str(data)
 
     def _import_list(self, section, option, type = int):
+        """Fonction d'importation des données d'une section/option
+        Utilise une fonction de conversion type pour appliquer un réglage
+        sur la valeur. La sortie est une liste de valeurs coupé aux ";"
+        Arguments
+        * section: section du fichier de configuration
+        * option: option dans la section
+        * type: fonction lambda par exemple
+
+        Retourne
+        * valeur: sous type ou str
+        """
+
         data = self.parser.get(section, option)
         data = data.replace(' ', '')
         data = data.split(';')
@@ -16,8 +40,22 @@ class Configuration:
         return data
 
     def __init__(self, path):
+        """Fonction principal : importation du fichier de configuration.
+        Les données sont importés et enregistrées dans la classe pour être
+        accessible comme attributs.
+
+        Arguments
+        * path: chemin du fichier de configuration
+
+        Retourne
+        Rien
+        """
+
+        # Ouverture du fichier de configuration ATTENTION, encodage UTF-8
         self.parser = ConfigParser()
         self.parser.read(path, encoding = 'utf-8')
+        self.edt_title = self._import('path', 'title_edt')
+        self.default_col_sheet = self._import('path', 'colloscope_sheet')
 
         self.col_groupe = self._import('groupes', 'col_groupes')
         self.col_student = self._import_list('groupes', 'col_student')
@@ -33,6 +71,11 @@ class Configuration:
         
         self.lignes_semaine = self._import_list('colloscope', 'lignes_semaine')
         self.lignes = self._import_list('colloscope', 'lignes')
+
+        self.ds_sheet = self._import('DS', 'sheet', type = int)
+        self.col_sem_ds = self._import('DS', 'col_semaine')
+        self.col_ds = self._import('DS', 'col_ds')
+        self.lignes_ds = self._import_list('DS', 'lignes')
 
         self.output_file = self._import('path', 'output_file')
         self.input_file = self._import('path', 'input_file')
