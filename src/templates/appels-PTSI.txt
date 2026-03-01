@@ -1,0 +1,5 @@
+Bonjour {civilite},
+Vous trouverez en pièce jointe les feuilles d'appel nécessaires pour la semaine {semaine}.
+Bonne réception,
+Cordialement,
+Benoit C.

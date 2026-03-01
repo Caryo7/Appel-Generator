@@ -1,0 +1,6 @@
+Bonjour {civilite}, 
+Vous trouverez en pièce jointe la liste de tous les emplois du temps pour chaque groupe de la semaine {semaine}.
+Ces emplois du temps sont réalisés avec le colloscope, mais des colles peuvent parfois être déplacées.
+Soyez donc vigilant en vérifiant directement avec les élèves.
+Cordialement,
+Benoit
