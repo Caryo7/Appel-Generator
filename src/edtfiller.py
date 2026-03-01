@@ -1,4 +1,5 @@
 import openpyxl as xl
+from openpyxl.styles import PatternFill
 import os
 from zipfile import *
 from pathlib import Path
@@ -6,6 +7,9 @@ from datetime import datetime
 
 import excelsaver
 import dialogs
+
+IDLE_MODE = '' # or '\n' if console
+WHITE_FILL = PatternFill()
 
 # A ce stade, on a de quoi extraire le colloscope du fichier excel.
 # On peut récupérer la liste des colles de chaque groupes, et leur POSIX
@@ -30,10 +34,13 @@ def dt(h1, h2):
 
 
 class EDT:
-    def __init__(self, path):
+    def __init__(self, path, name, lang, title):
         self.wb = xl.load_workbook(path)
         self.colles = []
-        
+        self.name = name
+        self.lang = lang
+        self.title = title
+
     def me(self, groupe, semaine, colle):
         self.groupe = groupe
         for col in range(1, 40): # range du nombre de colonnes de l'EDT
@@ -42,18 +49,33 @@ class EDT:
                 if v is None:
                     continue
 
-                if v.upper() == 'PT':
-                    self.sh.cell(column=col, row=row).value = 'PT - GROUPE {} - SEMAINE {} - POSITION {}'.format(groupe, semaine, colle)
+                if v.upper() == 'CLASSE':
+                    self.sh.cell(column=col, row=row).value = self.title.format(groupe = groupe,
+                                                                                semaine = semaine,
+                                                                                colle = colle,)
 
-    def feed(self, groupe_id):
+                elif 'DS' in v.upper():
+                    self.sh.cell(column = col, row = row).value = f'DS\n{semaine.DS}'
+
+                if 'LV2' in v.upper():
+                    if self.lang is not None:
+                        self.sh.cell(column = col, row = row).value = self.lang.capitalize()
+
+                    else:
+                        self.sh.cell(column = col, row = row).value = ''
+                        self.sh.cell(column = col, row = row).fill = WHITE_FILL
+
+    def feed(self, groupe_id, ssgrp_id):
         groupe_id = groupe_id.replace('/', '-')
-        self.sh = self.wb[groupe_id]
+        ssgrp = str('-' + ssgrp_id) if ssgrp_id is not None else ''
+        n = groupe_id + ssgrp
+        self.sh = self.wb[n]
         for sh in list(self.wb):
-            if sh.title == groupe_id:
+            if sh.title == n:
                 continue
 
             del self.wb[sh.title]
-    
+
     def fill(self, colle):
         day_line = 3
         col_heure = 1
@@ -94,34 +116,10 @@ class EDT:
                 elif v.upper() == 'HEURE':
                     self.sh.cell(column=col, row = row).value = datetime.today().strftime("%H:%M")
 
-        fp = os.path.join(os.path.abspath('.'), folder, 'groupe-{}'.format(self.groupe))
-        #try:
+        fp = os.path.join(os.path.abspath('.'), folder, 'groupe-{}-{}'.format(self.groupe, self.name))
         self.wb.save(fp + '.xlsx')
-        #except:
-        #    dialogs.warning("Erreur d'enregistrement, fichier ouvert (cf processus arrière plan)")
-
-        #try:
         return excelsaver.export_pdf(fp + '.xlsx')
-        #except:
-            #dialogs.warning("Erreur sur l'exportation, recommencez en fermant tout !")
-            #excel.Quit()
-            #del excel
 
-            #return False
-
-        #return fp + '.pdf'
-
-def import_edt(path):
-    """Ouvre l'emploi du temps des élèves, et en fait une "copie"
-    Arguments
-    * path : le lien vers le fichier qui contient l'emploi du temps
-             au format excel.
-             
-    Retourne un emploi du temps (class EDT)
-    """
-
-    e = EDT(path)
-    return e
 
 def zip_output(paths, semaine, folder):
     """Une fois l'enregistrement terminé, on peut mettre dans un fichier ZIP
@@ -145,7 +143,7 @@ def zip_output(paths, semaine, folder):
 
     z.close()
 
-def fill_edt(groupes, path, folder, semaine_nb):
+def fill_edt(groupes, path, folder, semaine_nb, table_addr, config):
     """Avec un dictionnaire des groupes de colle et un emploi du temps,
     vient remplir les trous volontairement laissés par le professeur
     en charge de la création des emplois du temps.
@@ -158,38 +156,41 @@ def fill_edt(groupes, path, folder, semaine_nb):
     * path    : Fichier emploi du temps
     * folder  : dossier de sortie des emplois du temps générés
     * semaine : le numéro de la semaine en cours
+    * table_addr: la table des élèves avec leurs adresses mails, ...
+    * config  : la configuration 
     """
 
-    n = len(groupes)
+    n = len(groupes) * 3 # *3 pour le nombre d'élève par groupe !
     i = 0
     pc = 0.0
     opc = 0.0
     fps = []
     for groupe, semaine in groupes.items():
         groupe_id = semaine.groupe_id
-        edt = EDT(path)
-        edt.feed(groupe_id)
-        edt.me(groupe, semaine.colles[0].semaine, semaine.colles[0].colle_id) # On récupère le numéro de la semaine via la première colle du groupe
+        for nom, family, _, lang, ssgrp in table_addr[groupe]:
+            edt = EDT(path, nom+'.'+family, lang, config.edt_title)
+            edt.feed(groupe_id, ssgrp)
+            edt.me(groupe, semaine.colles[0].semaine, semaine.colles[0].colle_id) # On récupère le numéro de la semaine via la première colle du groupe
 
-        ce = []
-        for colle in semaine.colles:
-            r = edt.fill(colle)
+            ce = []
+            for colle in semaine.colles:
+                r = edt.fill(colle)
+                if not r:
+                    ce.append(f'{str(colle)}, {colle.jour}, {colle.heure}, {colle.prof}, {colle.salle}')
+
+            if ce:
+                dialogs.warning('Colision de colles !', ', '.join(ce), '\n')
+
+            r = edt.export(folder)
             if not r:
-                ce.append(f'{str(colle)}, {colle.jour}, {colle.heure}, {colle.prof}, {colle.salle}')
+                return False
 
-        if ce:
-            dialogs.warning('Colision de colles !', ', '.join(ce), '\n')
-
-        r = edt.export(folder)
-        if not r:
-            return False
-
-        fps.append(r)
-        i += 1
-        pc = int(100*i/n)
-        if pc != opc:
-            opc = pc
-            dialogs.text('\r [' + '='*(int(pc/5)) + ' '*(20-int(pc/5)) + '] {} %'.format(pc), end = '')
+            fps.append(r)
+            i += 1
+            pc = int(100*i/n)
+            if pc != opc:
+                opc = pc
+                dialogs.text('\r [' + '='*(int(pc/5)) + ' '*(20-int(pc/5)) + '] {} %'.format(pc), end = IDLE_MODE)
 
     zip_output(fps, semaine_nb, folder)
     return True
@@ -197,23 +198,3 @@ def fill_edt(groupes, path, folder, semaine_nb):
 def clear():
     for fp in list(Path('output/').glob('**/*.xlsx')):
         os.remove(fp)
-
-
-if __name__ == '__main__':
-    import excelparser as ep
-    import config as confr
-    config = confr.Configuration('config/PT.ini')
-    table = ep.read_colloscope('colloscope.xlsx', config)
-    semaine = 6
-    thistable = ep.selector(table, semaine)
-    groupes = ep.sort_groupes(thistable)
-    r = fill_edt(groupes, 'EDT-PT.xlsx', 'output/')
-    clear()
-    if not r:
-        #return False
-        quit()
-
-    excel.Quit()
-    del excel
-
-
