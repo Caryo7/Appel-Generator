@@ -82,21 +82,9 @@ def read_colloscope(path, config):
     """
 
     # Section ouverture du fichier excel
-
     wb = xl.load_workbook(path)
-    sh = dialogs.ask_feuille(wb, path)
-    #act = 0
-    #dialogs.text('Le fichier {} comporte plusieurs feuilles'.format(path))
-    #for i, name in enumerate(wb.sheetnames):
-    #    star = ''
-    #    if wb.active.title == name:
-    #        act = i+1
-    #        star = '*'
-
-    #    dialogs.item(i+1, name, star)
-
-    #chx = dialogs.question('Quelle feuille voulez vous utiliser ?', act)
-    #sh = wb[wb.sheetnames[int(chx)-1]]
+    dialogs.text("Ouverture du colloscope")
+    sh = dialogs.ask_feuille(wb, path, config.default_col_sheet)
 
     # Section lecture de la liste des élèves
     groupes = {}
@@ -119,8 +107,6 @@ def read_colloscope(path, config):
             groupes[groupe] = []
 
         groupes[groupe].append(student)
-
-    #print(groupes)
 
     # Section lecture du colloscope
 
@@ -187,6 +173,28 @@ def read_colloscope(path, config):
 
     return table
 
+def get_this_ds(path, config, semaine):
+    """Récupération du DS de la semaine dans le colloscope.
+    Ouvre le colloscope et vient lire la table spéciale des DS
+    Arguments
+    * path: le fichier excel du colloscope
+    * config: le fichier de configuration
+    * semaine: la semaine actuelle
+
+    Retourne
+    * un nom de DS
+    """
+
+    dialogs.text('Détection du DS')
+    wb = xl.load_workbook(path)
+    sh = dialogs.ask_feuille(wb, path, default = config.ds_sheet)
+    col = config.col_sem_ds
+    col_ds = config.col_ds
+    lignes = config.lignes_ds
+    for l in lignes:
+        if sh.cell(column = col, row = l).value == semaine:
+            return sh.cell(column = col_ds, row = l).value
+
 def all_weeks(table):
     """Cette fonction prend en argument une table et sort toutes les semaines
     qui y sont présentés"""
@@ -217,6 +225,7 @@ def selector(table, semaine):
     for colle in table:
         if colle.semaine == semaine:
             extraction.append(colle)
+            extraction[-1].semaine = semaine
             
     return extraction
 
@@ -265,7 +274,10 @@ def read_modifs(modif_file, table):
     modifs = []
     row = 1
     colle_id = None
-    semaine = table[0].semaine
+    try:
+        semaine = table[0].semaine
+    except:
+        return None
 
     while sh.cell(row = row+1, column = 1).value:
         row += 1
