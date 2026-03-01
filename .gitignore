@@ -8,3 +8,4 @@
 **/*.pdf
 *.zip
 **/*.ini
+/src/temp-emails
