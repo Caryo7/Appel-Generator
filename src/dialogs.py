@@ -1,10 +1,11 @@
 from pathlib import Path
 import os
+import getpass
 import sys
 
 import config as confr
 
-NEVER_ASK = True
+NEVER_ASK = False
 
 def clear():
     # Efface le contenu du terminal
@@ -68,6 +69,16 @@ def question(text = '', default = None, prompt = '>>>', type = None):
 
     return data
 
+def ask_pwd(text, prompt = '>>> '):
+    # demande un mot de passe avec getpass
+    print('\x1b[36m', text)
+    pwd = None
+    while not pwd:
+        pwd = getpass.getpass('   \x1b[35;5m' + prompt + '\x1b[0m ')
+
+    return pwd
+    
+
 def end(action = 'revenir au menu principal'):
     # Texte de fin
     input(f' \x1b[34mAppuyez sur \x1b[37;5mEntrée\x1b[0m \x1b[34mpour {action}...')
@@ -104,7 +115,6 @@ def ask_config():
     * une class de configuration
     """
 
-    clear()
     # On scanne tous les fichiers
     p = Path('config/')
     text('Bienvenue, veuillez choisir une configuration')

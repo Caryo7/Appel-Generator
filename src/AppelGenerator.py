@@ -123,13 +123,11 @@ def send_mail():
 
     return 1
 
-def general(config = None):
+def general(semaine, pwd, show_folder = True, config = None):
     if not config:
         config = dialogs.ask_config()
 
     output_folder = dialogs.question('Dossier de sortie', default = config.output_path)
-    week = find_latest_week(output_folder)
-    semaine = Semaine(dialogs.question('Numéro de la semaine (Attention aux vacances !)', type = int, default = week))
     emails_file = dialogs.question('Adresses mails', default = config.emails_file)
     colloscope_file = dialogs.question('Colloscope', default = config.input_file)
     excel_edt = dialogs.question('Emplois du temps', default = config.edt_path)
@@ -149,6 +147,7 @@ def general(config = None):
         return -1
 
     groupes = excelparser.sort_groupes(thistable)
+    dialogs.text('Lancement de la génération')
     r = edtfiller.fill_edt(groupes, excel_edt, output_folder, semaine, table_addr, config)
     edtfiller.clear()
 
@@ -160,7 +159,9 @@ def general(config = None):
 
     app = excelparser.appel(tables, appel_file, config, semaine)
 
-    os.system(output_folder.replace('/', '\\') + f'output-S' + str(semaine) + '.zip')
+    if show_folder:
+        os.system(output_folder.replace('/', '\\') + f'output-S' + str(semaine) + '.zip')
+
     dialogs.question("\n\nFin de la génération. Validez pour continuer l'envoi des mails", default = '')
 
     infos = {}
@@ -176,25 +177,27 @@ def general(config = None):
         for nom, family, _, _, _ in people:
             fichiers[(nom, family)] = output_folder + f'groupe-{grp}-{nom}.{family}.pdf'
 
-    dialogs.text("\nEnvoi automatique de tous les emplois du temps")
-    automail.send_edt(list(fichiers.values()), table_edt, template_edt, semaine)
-    dialogs.text("\nEnvoi automatique de toutes les feuilles d'appel")
-    automail.send_edt([appel_file.replace('.xlsx', '.pdf')], table_appels, template_appels, semaine)
+    ask = dialogs.question("Envoi automatiques des mail administration ?", default = 'oui')
+    if ask.lower() == 'oui':
+        dialogs.text("\nEnvoi automatique de tous les emplois du temps")
+        automail.send_edt(list(fichiers.values()), table_edt, template_edt, semaine, pwd)
+        dialogs.text("\nEnvoi automatique de toutes les feuilles d'appel")
+        automail.send_edt([appel_file.replace('.xlsx', '.pdf')], table_appels, template_appels, semaine, pwd)
 
     dialogs.text("\nEnvoi automatique de tous les emplois du temps")
-    automail.AutoSendMail(table_addr, fichiers, semaine, infos, template)
+    automail.AutoSendMail(table_addr, fichiers, semaine, infos, template, pwd)
     return -1
 
 
 def quitter():
     return -1
 
-def htest():
+def htest(pwd, semaine):
     # Programme principal
     dialogs.clear()
     dialogs.text('''Programme de gestion du colloscope''')
     actions = [ # Actions disponibles
-        (general, 'Programme principal'),
+        (lambda: general(pwd, semaine), 'Programme principal'),
         (create_appel, 'Créer une feuille d\'appel'),
         (create_edts, 'Créer les emplois du temps pour une semaine'),
         (send_mail, 'Envoyer les emplois du temps par mail'),
@@ -222,8 +225,19 @@ def htest():
         dialogs.question('Programme terminé', default = '')
 
 if __name__ == '__main__':
+    pwd = dialogs.ask_pwd("Mot de passe de l'expéditeur")
+
     parser = ConfigParser()
     parser.read('config/intern.ini', encoding = 'utf-8')
     run = parser.get('sequence', 'run').split(';')
+    show_folder = parser.get('view', 'zip').lower() == 'yes'
+    week = find_latest_week('output/')
+    semaine = Semaine(dialogs.question('Numéro de la semaine (Attention aux vacances !)', type = int, default = week))
+
+    if not run:
+        htest(pwd, semaine)
+
     for config in run:
-        general(confr.Configuration(config))
+        general(semaine, pwd, show_folder, confr.Configuration(config))
+
+    input('\x1b[0mProgramme terminé... ')

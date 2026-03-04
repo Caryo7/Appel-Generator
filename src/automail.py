@@ -3,6 +3,7 @@ from email import encoders
 from email.mime.base import MIMEBase
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
+from email.mime.application import MIMEApplication
 import email, smtplib, ssl
 import openpyxl as xl
 from pathlib import Path
@@ -10,23 +11,21 @@ from configparser import ConfigParser
 import dialogs
 import time
 
-TEST_MODE = True # False # Double sécurité !
+TEST_MODE = False # False # Double sécurité !
 IDLE_MODE = '' # ' ' en console
 
 class EmailSender:
+    def __init__(self, pwd):
+        self.password_email = pwd
+
     def reload_sender(self):
         """Chargement du server et de son nom
         à partir du fichier de configuration interne.
-        Ce dernier doit contenir une section du type suivant
-        [mail]
-        email = <email from>
-        password = password of email from
         """
 
         parser = ConfigParser()
         parser.read('./config/intern.ini')
         self.sender_email = parser.get('mail', 'email')
-        self.password_email = parser.get('mail', 'password')
         self.server = 'smtp.' + self.sender_email.split('@')[1]
 
     def send(self, to, subject, text, files = [], test = True):
@@ -58,15 +57,16 @@ class EmailSender:
 
             for filename in files:
                 # Ouverture des fichiers joints et lecture pour encodage
+                p = Path(filename)
                 with open(filename, "rb") as attachment:
-                    part = MIMEBase("application", "octet-stream")
-                    part.set_payload(attachment.read())
+                    #part = MIMEBase("application", "octet-stream")
+                    #part.set_payload(attachment.read())
+                    part = MIMEApplication(attachment.read(), Name = str(p.name))
 
                 # Encodage des fichiers en Base64 pour l'envoie par mail
-                encoders.encode_base64(part)
+                #encoders.encode_base64(part)
 
                 # Ajout des descripteurs de pièce jointe
-                p = Path(filename)
                 part.add_header(
                     "Content-Disposition",
                     f"attachment; filename= {p.name}",
@@ -192,7 +192,7 @@ def ligne_colle(infos):
 
     return txt
 
-def send_edt(fichiers, table_out, template, semaine):
+def send_edt(fichiers, table_out, template, semaine, pwd):
     """Envoi automatique des autres infos à qui de droit.
     Prend en charge l'envoi avec informations sur la civilité dans le
     modèle et le numéro de la semaine. Permet d'envoyer plusieurs fichier,
@@ -209,7 +209,7 @@ def send_edt(fichiers, table_out, template, semaine):
     """
 
     # Ouverture de l'envoyeur
-    ems = EmailSender()
+    ems = EmailSender(pwd)
     sujet = 'Emplois du temps semaine ' + str(semaine)
 
     # Récupération du modèle
@@ -226,7 +226,7 @@ def send_edt(fichiers, table_out, template, semaine):
                  test = False,
                  )
 
-def AutoSendMail(table, files, semaine, infos, template):
+def AutoSendMail(table, files, semaine, infos, template, pwd):
     """Fonction d'envoi automatique des mails pour les élèves
     Arguments
     * table : la table des adresses mail
@@ -234,13 +234,14 @@ def AutoSendMail(table, files, semaine, infos, template):
     * semaine : le numéro de semaine actuel
     * infos : les informations sur les groupes (pour récupérer le nom de la position)
     * template : le fichier modèle de texte
+    * pwd: le mot de passe de l'expéditeur
 
     Retourne
     Rien
     """
 
     # Ouverture du serveur
-    ems = EmailSender()
+    ems = EmailSender(pwd)
     sujet = 'Emploi du temps semaine ' + str(semaine)
 
     # Lecture du modèle

@@ -165,6 +165,7 @@ def fill_edt(groupes, path, folder, semaine_nb, table_addr, config):
     pc = 0.0
     opc = 0.0
     fps = []
+    ce = []
     for groupe, semaine in groupes.items():
         groupe_id = semaine.groupe_id
         for nom, family, _, lang, ssgrp in table_addr[groupe]:
@@ -172,14 +173,10 @@ def fill_edt(groupes, path, folder, semaine_nb, table_addr, config):
             edt.feed(groupe_id, ssgrp)
             edt.me(groupe, semaine.colles[0].semaine, semaine.colles[0].colle_id) # On récupère le numéro de la semaine via la première colle du groupe
 
-            ce = []
             for colle in semaine.colles:
                 r = edt.fill(colle)
                 if not r:
                     ce.append(f'{str(colle)}, {colle.jour}, {colle.heure}, {colle.prof}, {colle.salle}')
-
-            if ce:
-                dialogs.warning('Colision de colles !', ', '.join(ce), '\n')
 
             r = edt.export(folder)
             if not r:
@@ -191,6 +188,10 @@ def fill_edt(groupes, path, folder, semaine_nb, table_addr, config):
             if pc != opc:
                 opc = pc
                 dialogs.text('\r [' + '='*(int(pc/5)) + ' '*(20-int(pc/5)) + '] {} %'.format(pc), end = IDLE_MODE)
+
+    print()
+    if ce:
+        dialogs.warning('Colision de colles !', ', '.join(ce), '\n')
 
     zip_output(fps, semaine_nb, folder)
     return True
