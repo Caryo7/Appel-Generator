@@ -4,6 +4,7 @@ import dialogs
 from configparser import *
 import config as confr
 import automail
+import excelsaver
 
 import os
 import sys
@@ -157,7 +158,7 @@ def general(semaine, pwd, show_folder = True, config = None):
         _thistable = excelparser.selector(table, _semaine)
         tables[int(_semaine)] = _thistable
 
-    app = excelparser.appel(tables, appel_file, config, semaine)
+    app = excelsaver.appel(tables, appel_file, config, semaine)
 
     if show_folder:
         os.system(output_folder.replace('/', '\\') + f'output-S' + str(semaine) + '.zip')
