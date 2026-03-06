@@ -1,8 +1,9 @@
 Coucou {name},
-Voici en pièce jointe ton emploi du temps pour la semaine {semaine}. Tu seras en position {position} pour mardi.
-Samedi, on aura le DS {ds}.
+Voici en pièce jointe ton emploi du temps pour la semaine {semaine}. Tu seras dans le groupe {position}
+Samedi, vous aurez le DS {ds}.
 Voici un petit recap des colles
 {colles}
 
 A plus,
-Benoit
+Benoit (en 2A)
+PS. C'est la première fois que le programme tourne, il est fort probable qu'il y ait des erreurs duent à des changements d'emplois du temps, de groupes ou de colles... Bref, faites moi remonter tout ce qui ne va pas pour que je mette à jour semaine prochaine... Merci !
