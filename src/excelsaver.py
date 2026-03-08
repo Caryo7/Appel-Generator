@@ -4,6 +4,7 @@ from openpyxl.styles.fonts import Font
 import openpyxl as xl
 import dialogs
 import config as confr # On utilise le fichier config du dossier
+import os
 
 excel = DispatchEx('Excel.Application')
 excel.Visible = 0

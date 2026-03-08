@@ -2,6 +2,7 @@ E = '\x1b[{}m'
 R = '\x1b[0m'
 import sys
 import os
+import getpass
 try:
     col, height = os.get_terminal_size()
 except:
@@ -41,6 +42,7 @@ class Theme:
     cursor = {'bg': 'white', 'fg': 'red', 'style': 'blink'}
     question = {'bg': 'blue', 'fg': 'green'}
     soft = {'bg': 'blue', 'fg': 'red', 'style': 'blink'}
+    warning = {'bg': 'blue', 'fg': 'red', 'style': 'blink'}
 
 theme = Theme()
 
@@ -86,11 +88,11 @@ def cnt(txt, ln = col):
     return a*' ' + txt + (ln-n-a)*' '
 
 def emptyLine():
-    return c(' |' + ' '*(col-4) + '| ', style = theme.background) + R
+    return c('  ║' + ' '*(col-6) + '║  ', style = theme.background) + R
 
 def start_line():
     txt1 = ' '*(col)
-    txt2 = ' +' + '-'*(col-4) + '+ '
+    txt2 = '  ╔' + '═'*(col-6) + '╗  '
     r1 = c(txt1, style=theme.background) + R
     r2 = c(txt2, style=theme.background) + R
     r3 = emptyLine()
@@ -98,7 +100,7 @@ def start_line():
 
 def end_line():
     txt1 = ' '*(col)
-    txt2 = ' +' + '-'*(col-4) + '+ '
+    txt2 = '  ╚' + '═'*(col-6) + '╝  '
     r1 = c(txt1, style=theme.background) + R
     r2 = c(txt2, style=theme.background) + R
     r3 = emptyLine()
@@ -109,7 +111,7 @@ def inFrame(*args):
     for a in args:
         txt += a
 
-    return c(' |', style=theme.background) + txt + c('| ', style=theme.background) + R
+    return c('  ║', style=theme.background) + txt + c('║  ', style=theme.background) + R
 
 def autoWrap(txt, lines = []):
     buffer = ''
@@ -126,13 +128,15 @@ def centerLine(*args, cursor = False):
     txt = c(*args, style = theme.text)
     if cursor:
         txt = txt.replace('_', c('_', style = theme.cursor) + balise(theme.text))
-    else:
+    elif cursor == False:
         txt = txt.replace('_', '')
+    else:
+        pass
 
     return inFrame(
         cnt(
             txt + R + balise(theme.background),
-            ln = col-4,
+            ln = col-6,
             )
         )
 
@@ -156,29 +160,47 @@ def centerText(*lines):
     txt += end_line()
     return txt
 
-def finalPrint(txt, asking = '', prompt = '>>> '):
+def finalPrint(txt, asking = '', prompt = '>>> ', fnct = input, aloadempty = True):
     print(balise(theme.background))
-    ans = None
-    while not ans:
+    if fnct is not None:
+        ans = None
+        while not ans:
+            clear()
+            print(txt, end = '')
+            ans = fnct(c('[' + asking + ']', style = theme.question) + ' ' + c(prompt, style = theme.soft) + R + balise(theme.background))
+            if not ans and aloadempty:
+                return ans
+
+        return ans
+    else:
         clear()
         print(txt, end = '')
-        ans = input(c(asking, style = theme.question) + ' ' + c(prompt, style = theme.soft) + R + balise(theme.background))
-
-    return ans
 
 class Prompt:
-    def __init__(self, name, value = '', show = None):
+    splitter = ' : _'
+
+    def __init__(self, name = '', value = '', show = None, fnct = input):
         self.name = name
         self.value = value
         self.show = show
+        self.fnct = fnct
 
     def get(self):
         if self.show != '*':
-            return self.name + ' : _' + self.value
+            return self.name + self.splitter + str(self.value)
         else:
-            return self.name + ' : _' + '*'*len(self.value)
+            return self.name + self.splitter + '*'*len(str(self.value))
 
-def askData(txt, prompts, nothing = True):
+def progress(pc):
+    txt = '►'
+    txt += '█'*(int(pc*20))
+    txt += '░'*(20-int(pc*20))
+    txt += '◄ '
+    txt += str(round(pc*100, 1))
+    txt += ' %'
+    return txt
+
+def askData(txt, prompts, nothing = True, autoquit = True, prompt = '>>> '):
     title = setLines(txt)
     space = emptyLine()
 
@@ -186,16 +208,32 @@ def askData(txt, prompts, nothing = True):
     while 1:
         options = []
         default = ''
+        interf = input
         for i, pro in enumerate(prompts):
             c = cursor == i
             if c:
                 default = pro.value
+                interf = pro.fnct
 
             options.append(setLines(pro.get(), cursor = cursor == i))
 
         data = centerText(title, space, *options)
-        out = finalPrint(data, asking = default)
+        ask = finalPrint(data, asking = str(default), fnct = interf, prompt = prompt)
 
+        # On récupère la donnée
+        if ask == default:
+            out = default
+
+        elif not ask and default:
+            out = default
+
+        elif not ask:
+            continue
+
+        else:
+            out = ask
+
+        # On la traite
         if out == 'next':
             return prompts, 'next'
         elif out == 'prev':
@@ -205,10 +243,17 @@ def askData(txt, prompts, nothing = True):
         else:
             prompts[cursor].value = out
             cursor = (cursor + 1) % len(prompts)
+            if cursor == 0:
+                return prompts, 'next'
 
+def interpret_print(*args, **kwargs):
+    end = '\n' if 'end' not in kwargs else kwargs['end']
+    sep = ' ' if 'sep' not in kwargs else kwargs['sep']
+    return sep.join(list(map(str, args))) + str(end)
 
-print(askData('Veuillez entrer vos coordonnées pour l\'envoi autamatique des mails',
-              prompts = [Prompt('Adresse mail'), Prompt('Mot de passe', show='*')],
-              ))
+if __name__ == '__main__':
+    print(askData('Veuillez entrer vos coordonnées pour l\'envoi autamatique des mails',
+                  prompts = [Prompt('Adresse mail'), Prompt('Mot de passe', show='*', fnct = getpass.getpass)],
+                  ))
 
-print(R)
+    print(R)

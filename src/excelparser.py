@@ -7,11 +7,14 @@
 from pathlib import Path
 import sys
 import os
+import openpyxl as xl
 
 import config as confr # On utilise le fichier config du dossier
 import dialogs
 import edtfiller
 import excelsaver
+
+import box
 
 class Colle:
     # Attributs de la classe (fixe pour chaque colle)
@@ -65,14 +68,37 @@ class Colle:
             colle_id = self.colle_id
             )
 
-def read_colloscope(path, config):
+def create_groups(table):
+    """Extrait de la table des adresses mail la liste des groupes
+    et leurs élèves.
+
+    Arguments
+    * table : la table des adresse mail venant de automail.py
+
+    Retourne
+    * groupes : dict des groupes/noms
+    """
+
+    grp = {}
+    for groupe, k in table.items():
+        ns = []
+        for nom, family, addr, lang, ssgrp in k:
+            ns.append(nom)
+
+        grp[groupe] = ns
+
+    return grp
+
+def read_colloscope(path, config, table_addr):
     """Lecture du fichier excel .xlsx du colloscope.
     Ce dernier sera traité selon la configuration, et retournera une
     liste de colles. Cette liste de colle sera mélangée, mais chaque colle
     aura sont propre identifiant pour se repérer dans le temps !
-    
+
     Arguments
     * path : fichier excel à ouvrir
+    * config : configuration actuelle
+    * table_addr : la table des emails pour avoir tous les groupes !
     
     Sortie
     * table : liste de Colle
@@ -80,30 +106,10 @@ def read_colloscope(path, config):
 
     # Section ouverture du fichier excel
     wb = xl.load_workbook(path)
-    dialogs.text("Ouverture du colloscope")
-    sh = dialogs.ask_feuille(wb, path, config.default_col_sheet)
+    sh = box.ask_feuille("Ouverture du colloscope", wb, path, config.default_col_sheet)
 
     # Section lecture de la liste des élèves
-    groupes = {}
-    col_groupe = config.col_groupe
-    col_student = config.col_student
-    lignes_eleves = config.lignes_eleves
-
-    for line in lignes_eleves:
-        l = line
-        while sh.cell(column = col_groupe, row = l).value is None:
-            l -= 1
-
-        groupe = sh.cell(column = col_groupe, row = l).value
-        std = []
-        for col_stud in col_student:
-            std.append(sh.cell(column = col_stud, row = line).value)
-
-        student = ' '.join(std)
-        if groupe not in groupes:
-            groupes[groupe] = []
-
-        groupes[groupe].append(student)
+    groupes =  create_groups(table_addr)
 
     # Section lecture du colloscope
 
@@ -125,6 +131,7 @@ def read_colloscope(path, config):
     # Le choix est fait de parcourir toutes les lignes en premier,
     # On aurait aussi pu parcourir les colonnes en premier
     table = []
+    ws = []
     for line in lignes:
         prof = sh.cell(column=col_prof, row=line).value
         salle = sh.cell(column=col_salle, row=line).value
@@ -161,12 +168,15 @@ def read_colloscope(path, config):
 
                 try:
                     Kh.eleves = groupes[groupe]
+
                 except:
-                    dialogs.warning('Attention', prof, 'semaine', semaine, 'a le groupe', groupe, 'qui est inconnu !')
+                    ws.append(f'Attention {prof} semaine {semaine} a le groupe {groupe} qui est inconnu !')
 
                 table.append(Kh)
 
     wb.close() # Ne pas oublier pour ne pas bloquer excel !
+    if ws:
+        box.warning("Reconnaissance des colles", ws)
 
     return table
 
@@ -182,9 +192,8 @@ def get_this_ds(path, config, semaine):
     * un nom de DS
     """
 
-    dialogs.text('Détection du DS')
     wb = xl.load_workbook(path)
-    sh = dialogs.ask_feuille(wb, path, default = config.ds_sheet)
+    sh = box.ask_feuille('Détection du DS', wb, path, default = config.ds_sheet)
     col = config.col_sem_ds
     col_ds = config.col_ds
     lignes = config.lignes_ds
@@ -258,7 +267,7 @@ def read_modifs(modif_file, table):
     """
 
     wb = xl.load_workbook(modif_file)
-    sh = dialogs.ask_feuille(wb, modif_file)
+    sh = box.ask_feuille("Modifications de dernière minute", wb, modif_file)
 
     ## Formatage
     # Colonne 1 : Groupe

@@ -10,23 +10,34 @@ from pathlib import Path
 from configparser import ConfigParser
 import dialogs
 import time
+import config
+import box
 
-TEST_MODE = False # False # Double sécurité !
-IDLE_MODE = '' # ' ' en console
+TEST_MODE = config.noMail()
+IDLE_MODE = config.idleMode()
 
 class EmailSender:
-    def __init__(self, pwd):
-        self.password_email = pwd
+    def __init__(self, mail, pwd):
+        """Connexion au serveur mail au démarrage du programme.
+        Plus besoin de se reconnecter à chaque mail et ainsi générer une erreur
+        Arguments
+        * mail : l'adresse email
+        * pwd : le mot de passe de connexion
 
-    def reload_sender(self):
-        """Chargement du server et de son nom
-        à partir du fichier de configuration interne.
+        Retourne
+        Rien
         """
 
-        parser = ConfigParser()
-        parser.read('./config/intern.ini')
-        self.sender_email = parser.get('mail', 'email')
-        self.server = 'smtp.' + self.sender_email.split('@')[1]
+        srv_name = 'smtp.' + mail.split('@')[1]
+        self.sender_email = mail
+
+        try:
+            context = ssl.create_default_context()
+            self.server = smtplib.SMTP_SSL(srv_name, 465, context=context)
+            self.server.login(mail, pwd)
+        except Exception: # Impossible de se connecter au serveur
+            global TEST_MODE
+            TEST_MODE = True
 
     def send(self, to, subject, text, files = [], test = True):
         """Permet d'envoyer un email automatiquement
@@ -40,9 +51,6 @@ class EmailSender:
         Retourne
         * booléen: erreur ou pas d'erreur
         """
-
-        # On recharge le paramétrage du serveur
-        self.reload_sender()
 
         try:
             # Création d'un mail et paramétrage des entêtes
@@ -76,34 +84,25 @@ class EmailSender:
                 message.attach(part)
 
             text = message.as_string()
-
             # Vérification du mode de test
             if TEST_MODE or test:
                 # Simulation de l'envoie du mail, et enregistrement du fichier .eml dans le dossier temporaire
-                dialogs.info('Simulation envoi...', end = '')
                 time.sleep(0.3)
                 f = open(f'temp-emails/{to}-{time.time()}.eml', 'w', encoding = 'utf-8')
                 f.write(text)
                 f.close()
                 return True # Le mail factice a bien été envoyé
 
-            else:
-                dialogs.info('                   ', end = '')
-
-            # Création de la connexion
-            context = ssl.create_default_context()
-            with smtplib.SMTP_SSL(self.server, 465, context=context) as server:
-                # Ouverture du serveur mail
-                server.login(self.sender_email, self.password_email)
-                server.sendmail(self.sender_email, to, text) # Envoi
+            # Envoi du mail
+            self.server.sendmail(self.sender_email, to, text)
 
             # Mail bien envoyé
             return True
 
         except Exception as e: # En cas d'erreur
             print()
-            dialogs.warning('Une erreur s\'est produite en envoyant un mail.\nAdresse de récéption prévue:\n' + str(to) + '\nErreur:\n' + str(e) + '\nVoulez vous continuer ?')
-            ask = dialogs.question('Continuer ?', default = 'Oui').lower()[0] == 'o'
+            ask = box.warning("Envoi automatique", ['Une erreur s\'est produite en envoyant un mail.', 'Adresse de récéption prévue:', str(to), 'Erreur:', str(e), 'Voulez vous continuer ?'])
+            #ask = dialogs.question('Continuer ?', default = 'Oui').lower()[0] == 'o'
             return ask
 
 
@@ -119,14 +118,14 @@ def importExcelFile(path):
     wb = xl.load_workbook(path) # Ouverture du fichier excel
     out = []
     for i, title in enumerate(['élèves', 'emplois du temps', 'appels']):
-        dialogs.text('Email pour les', title)
-        sh = dialogs.ask_feuille(wb, path, default = i)
+        sh = box.ask_feuille(f'Email pour les {title}', wb, path, default = i)
 
         ## Formatage :
         # Colonne A : groupe (si première feuille sinon on commence à la A)
         # Colonne B : nom
         # Colonne C : adresse Email
         # Colonne D : langue vivante de l'élève (facultative: None par défaut)
+        # Colonne E : sous groupe fixe de l'élève !
 
         row = 2
         table = {}
@@ -192,7 +191,7 @@ def ligne_colle(infos):
 
     return txt
 
-def send_edt(fichiers, table_out, template, semaine, pwd):
+def send_edt(fichiers, table_out, template, semaine, ems):
     """Envoi automatique des autres infos à qui de droit.
     Prend en charge l'envoi avec informations sur la civilité dans le
     modèle et le numéro de la semaine. Permet d'envoyer plusieurs fichier,
@@ -203,13 +202,13 @@ def send_edt(fichiers, table_out, template, semaine, pwd):
     * table_out : la table des adresses mail
     * template : le fichier modèle de texte
     * semaine : le numéro de la semaine
+    * ems : l'unité d'envoi des mails
 
     Retourne
     Rien
     """
 
     # Ouverture de l'envoyeur
-    ems = EmailSender(pwd)
     sujet = 'Emplois du temps semaine ' + str(semaine)
 
     # Récupération du modèle
@@ -226,7 +225,7 @@ def send_edt(fichiers, table_out, template, semaine, pwd):
                  test = False,
                  )
 
-def AutoSendMail(table, files, semaine, infos, template, pwd):
+def AutoSendMail(table, files, semaine, infos, template, ems):
     """Fonction d'envoi automatique des mails pour les élèves
     Arguments
     * table : la table des adresses mail
@@ -234,14 +233,13 @@ def AutoSendMail(table, files, semaine, infos, template, pwd):
     * semaine : le numéro de semaine actuel
     * infos : les informations sur les groupes (pour récupérer le nom de la position)
     * template : le fichier modèle de texte
-    * pwd: le mot de passe de l'expéditeur
+    * ems: l'unité d'envoi de mails
 
     Retourne
     Rien
     """
 
     # Ouverture du serveur
-    ems = EmailSender(pwd)
     sujet = 'Emploi du temps semaine ' + str(semaine)
 
     # Lecture du modèle
@@ -249,34 +247,33 @@ def AutoSendMail(table, files, semaine, infos, template, pwd):
     content = f.read()
     f.close()
 
-    n = 0
     l = 0
-    pc = 0
+    lm = 0
     for _, eleves in table.items():
         l += len(eleves)
+        for nom, _, _, _, _ in eleves:
+            if len(nom) > lm:
+                lm = len(nom)
 
     # Sécurité automatique pour ne pas envoyer par erreur tous les mails automatiquement
-    ask = dialogs.question('Confirmez la désactivation du mode de test ?', prompt = '[OUI/NON -> NON] >>> ', default = 'NON')
+    ask = box.question('Confirmez la désactivation du mode de test ?', prompt = '[OUI/NON -> NON] >>> ', default = 'NON')
     if ask != 'OUI':
         TEST = True
     else:
         TEST = False
 
+    p = box.Progress('Envoi automatique des emails', l, larg = lm)
     for groupe, eleves in table.items():
         # Récupération du fichier et de la position du groupe
-        #fichier = files[groupe]
         info = infos[groupe]
         for nom, family, addr, _, _ in eleves:
             fichier = files[(nom, family)]
-            n += 1
-            pc = int(100 * n / l)
-            vpc = int(20 * n / l)
-            dialogs.text(' [', '='*vpc, ' '*(20-vpc), '] ', str(pc), ' % ', nom, end = ' ', sep = '')
 
             this_test = TEST
             if not addr: # Si il n'y a pas d'adresse mail, on fait comme si il y avait simulation d'envoi
                 this_test = True
-                dialogs.warning('NO-MAIL! ', end = '')
+
+            p.step(nom, color = 'red' if not addr else None, bar = 'yellow' if this_test or TEST_MODE or not addr else None)
 
             # Envoi automatique
             r = ems.send(addr, sujet,
@@ -290,9 +287,5 @@ def AutoSendMail(table, files, semaine, infos, template, pwd):
                          test = this_test,
                          )
 
-            print('\r', end = IDLE_MODE)
-
             if not r: # Si une erreur s'est produite et qu'on doit s'arrêter, on coupe
                 return
-
-    print()

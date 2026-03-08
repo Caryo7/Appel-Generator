@@ -1,5 +1,16 @@
 from configparser import *
 
+def getSimple(section, option, file = './config/intern.ini'):
+    parser = ConfigParser()
+    parser.read(file, encoding = 'utf-8')
+    return parser.get(section, option)
+
+def idleMode():
+    return '\n' if getSimple('mode', 'idle') == 'oui' else ''
+
+def noMail():
+    return getSimple('mode', 'nomail') == 'oui'
+
 class Configuration:
     def _import(self, section, option, type = int):
         """Fonction d'importation des données d'une section/option
@@ -56,10 +67,6 @@ class Configuration:
         self.parser.read(path, encoding = 'utf-8')
         self.edt_title = self._import('path', 'title_edt')
         self.default_col_sheet = self._import('path', 'colloscope_sheet')
-
-        self.col_groupe = self._import('groupes', 'col_groupes')
-        self.col_student = self._import_list('groupes', 'col_student')
-        self.lignes_eleves = self._import_list('groupes', 'lignes_eleves')
 
         self.col_prof = self._import('colloscope', 'col_prof')
         self.col_salle = self._import('colloscope', 'col_salle')

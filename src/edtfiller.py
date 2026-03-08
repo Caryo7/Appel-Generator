@@ -7,8 +7,11 @@ from datetime import datetime
 
 import excelsaver
 import dialogs
+import config
 
-IDLE_MODE = '' # or '\n' if console
+import box
+
+IDLE_MODE = config.idleMode() # or '\n' if console
 WHITE_FILL = PatternFill()
 
 # A ce stade, on a de quoi extraire le colloscope du fichier excel.
@@ -53,8 +56,7 @@ class EDT:
                     self.sh.cell(column=col, row=row).value = self.title.format(groupe = groupe,
                                                                                 semaine = semaine,
                                                                                 colle = colle,)
-
-                elif 'DS' in v.upper():
+                elif v.upper() == 'DS':
                     self.sh.cell(column = col, row = row).value = f'DS\n{semaine.DS}'
 
                 if 'LV2' in v.upper():
@@ -160,12 +162,17 @@ def fill_edt(groupes, path, folder, semaine_nb, table_addr, config):
     * config  : la configuration 
     """
 
-    n = len(groupes) * 3 # *3 pour le nombre d'élève par groupe !
-    i = 0
     pc = 0.0
     opc = 0.0
     fps = []
     ce = []
+    lm = 0
+    for groupe, semaine in groupes.items():
+        for nom, family, _, lang, ssgrp in table_addr[groupe]:
+            if len(nom) > lm:
+                lm = len(nom)
+
+    p = box.Progress('Compilation...', length=3*len(groupes), larg = lm)
     for groupe, semaine in groupes.items():
         groupe_id = semaine.groupe_id
         for nom, family, _, lang, ssgrp in table_addr[groupe]:
@@ -183,15 +190,10 @@ def fill_edt(groupes, path, folder, semaine_nb, table_addr, config):
                 return False
 
             fps.append(r)
-            i += 1
-            pc = int(100*i/n)
-            if pc != opc:
-                opc = pc
-                dialogs.text('\r [' + '='*(int(pc/5)) + ' '*(20-int(pc/5)) + '] {} %'.format(pc), end = IDLE_MODE)
+            p.step(nom)
 
-    print()
     if ce:
-        dialogs.warning('Colision de colles !', ', '.join(ce), '\n')
+        box.warning('Colision de colles !', ce)
 
     zip_output(fps, semaine_nb, folder)
     return True
