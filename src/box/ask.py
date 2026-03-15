@@ -3,13 +3,17 @@ import automail
 import getpass
 
 def askEmail():
-    mail = Prompt('Adresse mail')
-    pwd = Prompt('Mot de passe', show = '*', fnct = getpass.getpass)
-    data = askData('Veuillez entrer vos coordonnées mail',
-                         prompts = [mail, pwd])
+    ems = automail.EmailSender()
+    r = False
+    while not r:
+        mail = Prompt('Adresse mail')
+        pwd = Prompt('Mot de passe', show = '*', fnct = getpass.getpass)
+        data = askData('Veuillez entrer vos coordonnées mail',
+                             prompts = [mail, pwd])
 
-    es = automail.EmailSender(data[0][0].value, data[0][1].value)
-    return es
+        r = ems.connect(data[0][0].value, data[0][1].value)
+
+    return ems
 
 def question(text = '', default = '', prompt = '>>> ', type = lambda k: k):
     pro = Prompt(value = default)
@@ -37,6 +41,14 @@ def warning(title, lines = []):
 
     data = centerText(*ls)
     return finalPrint(data)
+
+def show_text(txt):
+    ls = []
+    for l in txt.split('\n'):
+        ls.append(setLines(l))
+
+    data = centerText(*ls)
+    finalPrint(data, fnct = None)
 
 def ask_feuille(title, wb, path, default = None):
     act = 0
