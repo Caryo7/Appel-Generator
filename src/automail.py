@@ -15,9 +15,12 @@ import box
 
 TEST_MODE = config.noMail()
 IDLE_MODE = config.idleMode()
+MAX_MAIL_NB = 20
 
 class EmailSender:
-    def __init__(self, mail, pwd):
+    counter = 0
+
+    def connect(self, mail = None, pwd = None):
         """Connexion au serveur mail au démarrage du programme.
         Plus besoin de se reconnecter à chaque mail et ainsi générer une erreur
         Arguments
@@ -28,16 +31,44 @@ class EmailSender:
         Rien
         """
 
+        if mail is not None:
+            box.show_text('Tentative de connexion...')
+
+        if mail is not None:
+            self.mail = mail
+        else:
+            mail = self.mail
+
+        if pwd is not None:
+            self.pwd = pwd
+        else:
+            pwd = self.pwd
+
         srv_name = 'smtp.' + mail.split('@')[1]
         self.sender_email = mail
 
         try:
             context = ssl.create_default_context()
             self.server = smtplib.SMTP_SSL(srv_name, 465, context=context)
+            #self.server = smtplib.SMTP(srv_name)
+            #self.server.ehlo()
+            #self.server.starttls()
             self.server.login(mail, pwd)
-        except Exception: # Impossible de se connecter au serveur
+            return True
+
+        except Exception as e: # Impossible de se connecter au serveur
             global TEST_MODE
             TEST_MODE = True
+            return box.warning("Connexion", ["Connexion impossible", "L'erreur suivante à été déclenchée :", str(e), "Continuer [oui] ?"]) == 'oui'
+
+    def reconnectTest(self):
+        self.counter += 1
+        if self.counter > MAX_MAIL_NB:
+            box.show_text('Reconnexion de sécurité en cours...')
+            self.server.quit()
+            time.sleep(15)
+            self.connect()
+            self.counter = 0
 
     def send(self, to, subject, text, files = [], test = True):
         """Permet d'envoyer un email automatiquement
@@ -52,6 +83,7 @@ class EmailSender:
         * booléen: erreur ou pas d'erreur
         """
 
+        self.reconnectTest()
         try:
             # Création d'un mail et paramétrage des entêtes
             message = MIMEMultipart()
@@ -95,14 +127,17 @@ class EmailSender:
 
             # Envoi du mail
             self.server.sendmail(self.sender_email, to, text)
+            time.sleep(5)
 
             # Mail bien envoyé
             return True
 
         except Exception as e: # En cas d'erreur
             print()
-            ask = box.warning("Envoi automatique", ['Une erreur s\'est produite en envoyant un mail.', 'Adresse de récéption prévue:', str(to), 'Erreur:', str(e), 'Voulez vous continuer ?'])
-            #ask = dialogs.question('Continuer ?', default = 'Oui').lower()[0] == 'o'
+            ask = box.warning("Envoi automatique", ['Une erreur s\'est produite en envoyant un mail.', 'Adresse de récéption prévue:', str(to), 'Erreur:', str(e), 'Voulez vous continuer ?']) == 'oui'
+            if ask:
+                self.connect()
+
             return ask
 
 
