@@ -12,6 +12,7 @@ from pathlib import Path
 import launchers.general
 import box
 import graph
+from profmanager import *
 
 class Semaine:
     def __init__(self, numero):
@@ -92,21 +93,27 @@ def htest(pwd, semaine):
         dialogs.question('Programme terminé', default = '')
 
 if __name__ == '__main__':
-    ems = box.askEmail() #dialogs.ask_pwd("Mot de passe de l'expéditeur")
-
     parser = ConfigParser()
     parser.read('config/intern.ini', encoding = 'utf-8')
+
+    ems = box.askEmail(addr = parser.get('mail', 'email'))
     run = parser.get('sequence', 'run').split(';')
     show_folder = parser.get('view', 'zip').lower() == 'yes'
     week = find_latest_week('output/')
     semaine = Semaine(box.question('Numéro de la semaine (Attention aux vacances !)', type = int, default = week))
+    prof_manager = ProfManager(ems,
+                               parser.get('profs', 'addr'),
+                               parser.get('profs', 'template'),
+                               semaine,
+                               )
 
     if not run:
         htest(ems, semaine)
 
     for config in run:
-        launchers.general.general(semaine, ems, show_folder, confr.Configuration(config))
+        launchers.general.general(semaine, ems, prof_manager, show_folder, confr.Configuration(config))
 
+    prof_manager.start()
     box.question('Programme terminé...')
     graph.clear()
     print(graph.R)

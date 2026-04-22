@@ -5,5 +5,4 @@ Voici un petit recap des colles
 {colles}
 
 A plus,
-Benoit (en 2A)
-PS. C'est la première fois que le programme tourne, il est fort probable qu'il y ait des erreurs suite à des changements d'emploi du temps, de groupes ou de colles... Bref, faites-moi remonter tout ce qui ne va pas pour que je mette à jour semaine prochaine... Merci !
+Benoit

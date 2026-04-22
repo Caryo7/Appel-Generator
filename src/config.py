@@ -84,6 +84,7 @@ class Configuration:
         self.col_ds = self._import('DS', 'col_ds')
         self.lignes_ds = self._import_list('DS', 'lignes')
 
+        self.classe = self._import('path', 'classe')
         self.output_file = self._import('path', 'output_file')
         self.input_file = self._import('path', 'input_file')
         self.feuille_title = self._import('path', 'feuille_title')
@@ -91,6 +92,7 @@ class Configuration:
         self.output_path = self._import('path', 'output_path')
         self.edt_path = self._import('path', 'edt_path')
         self.modif_file = self._import('path', 'modification_file')
+        self.output_zip = self._import('path', 'output_zip')
 
         self.template_file = self._import('mails', 'template_eleve')
         self.template_edt = self._import('mails', 'template_edt')

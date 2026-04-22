@@ -5,12 +5,14 @@ import excelsaver
 import edtfiller
 import automail
 
+import os
 import box
 
-def general(semaine, ems, show_folder = True, config = None):
+def general(semaine, ems, prof_manager, show_folder = True, config = None):
     if not config:
         config = dialogs.ask_config()
 
+    classe = config.classe
     output_folder = box.question('Dossier de sortie', default = config.output_path)
     emails_file = box.question('Adresses mails', default = config.emails_file)
     colloscope_file = box.question('Colloscope', default = config.input_file)
@@ -27,11 +29,16 @@ def general(semaine, ems, show_folder = True, config = None):
     thistable = excelparser.selector(table, semaine)
     thistable = excelparser.read_modifs(modif_file, thistable)
     if thistable is None:
-        dialogs.warning(f"La semaine {semaine} n'existe pas ! Attention aux vacances !")
-        return -1
+        box.warning("Ouverture", [f"La semaine {semaine} n'existe pas ! Attention aux vacances !",])
+        return 1
 
+    iscolles = box.question('Colles', default = 'oui' if semaine.DS is not None else 'non') == 'oui'
     groupes = excelparser.sort_groupes(thistable)
-    r = edtfiller.fill_edt(groupes, excel_edt, output_folder, semaine, table_addr, config)
+    profs = excelparser.sort_profs(thistable, classe)
+    prof_manager.feed(profs)
+    #prof_manager.start() ##### DEBUG !!
+
+    r = edtfiller.fill_edt(groupes, excel_edt, output_folder, semaine, table_addr, config, iscolle = iscolles)
     edtfiller.clear()
 
     weeks = excelparser.all_weeks(table)
@@ -43,9 +50,10 @@ def general(semaine, ems, show_folder = True, config = None):
     app = excelsaver.appel(tables, appel_file, config, semaine)
 
     if show_folder:
-        os.system(output_folder.replace('/', '\\') + f'output-S' + str(semaine) + '.zip')
+        os.system(os.path.join(output_folder, config.output_zip.format(semaine)))
 
-    box.question("Fin de la génération. Validez pour continuer l'envoi des mails", default = '')
+    #box.question("Fin de la génération. Validez pour continuer l'envoi des mails", default = '')
+    os.system(f'edit "{template}"')
 
     infos = {}
     for colle in thistable:

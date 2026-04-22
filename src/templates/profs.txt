@@ -1,0 +1,7 @@
+Bonjour {civilite},
+Vous trouverez ci dessous la liste des élèves que vous aurez en colle cette semaine (n°{semaine} sur le colloscope)
+{liste}
+En vous souhaitant une bonne soirée,
+Benoit C
+
+PS Vous êtes aujourd'hui le premier et le seul à reçevoir ce mail. Normalement mon programme ne se trompe plus, mais par sécurité, pouvez vous vérifier et me dire demain si il n'y a pas eu d'erreurs ?

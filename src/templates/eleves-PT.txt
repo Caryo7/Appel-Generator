@@ -1,8 +1,5 @@
 Coucou {name},
-Voici en pièce jointe ton emploi du temps pour la semaine {semaine}. Tu seras en position {position} pour mardi.
-Samedi, on aura le DS {ds}.
-Voici un petit recap des colles
-{colles}
-
-A plus,
+Voici en pièce jointe ton emploi du temps pour la dernière semaine. Tu seras en position {position}.
+Il n'y a plus de groupes sauf pour l'anglais, et j'imagine que mardi il faudra choisir entre SII et physique...
+A demain,
 Benoit

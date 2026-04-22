@@ -17,6 +17,32 @@ TEST_MODE = config.noMail()
 IDLE_MODE = config.idleMode()
 MAX_MAIL_NB = 20
 
+HEADER = """<html>
+  <head>
+    <style type="text/css">
+      p {
+        color: #000000
+        line-height: 1;
+      }
+      .warning {
+        color: #ff0000;
+        font-weight: bold;
+      }
+    </style>
+  </head>
+  <body>
+"""
+
+FOOTER = """  </body>
+</html>"""
+
+def plainToHtml(plain):
+    plain = plain.replace('</ul>\n', '</ul>')
+    plain = plain.replace('</ul>\n', '</ul>')
+    html = '<p>' + plain.replace('\n', '<br>\n') + '</p>'
+
+    return HEADER + html + FOOTER
+
 class EmailSender:
     counter = 0
 
@@ -65,7 +91,12 @@ class EmailSender:
         self.counter += 1
         if self.counter > MAX_MAIL_NB:
             box.show_text('Reconnexion de sécurité en cours...')
-            self.server.quit()
+            try:
+                self.server.quit()
+            except:
+                self.counter = 0
+                return
+
             time.sleep(15)
             self.connect()
             self.counter = 0
@@ -92,7 +123,7 @@ class EmailSender:
             message["Subject"] = subject
 
             # Configuration du type d'affichage de text (plain vs html)
-            part = MIMEText(text, "plain")
+            part = MIMEText(plainToHtml(text), "html")
             message.attach(part)
 
             for filename in files:
@@ -127,7 +158,7 @@ class EmailSender:
 
             # Envoi du mail
             self.server.sendmail(self.sender_email, to, text)
-            time.sleep(5)
+            #time.sleep(1)
 
             # Mail bien envoyé
             return True
@@ -220,11 +251,11 @@ def ligne_colle(infos):
     * message: un text recap
     """
 
-    txt = ''
+    txt = '<ul>'
     for salle, heure, jour, prof, groupe in infos:
-        txt += f' - {prof} {jour.lower()} à {heure} en {salle}\n'
+        txt += f'<li>{prof} {jour.lower()} à {heure} en {salle}</li>'
 
-    return txt
+    return txt + '</ul>'
 
 def send_edt(fichiers, table_out, template, semaine, ems):
     """Envoi automatique des autres infos à qui de droit.

@@ -335,16 +335,16 @@ def read_modifs(modif_file, table):
 
 
 class Week:
-    def __init__(self, groupe_id):
-        self.groupe_id = groupe_id # = colle_id
+    def __init__(self, ide = None):
+        self.ide = ide
         self.colles = []
         
     def append(self, colle):
         self.colles.append(colle)
 
     def __repr__(self):
-        return '{groupe_id}-{nbcolle}'.format(
-            groupe_id = self.groupe_id,
+        return '{ide}-{nbcolle}'.format(
+            ide = self.ide,
             nbcolle = len(self.colles))
 
 
@@ -372,16 +372,17 @@ def sort_groupes(table):
 
     return groupes
 
-def sort_profs(table):
+def sort_profs(table, classe):
     """Cette fonction prend une table sur une semaine uniquement !
-    (Voir pour passer la table comùplète par selector(table, semaine)
+     (Voir pour passer la table complète par selector(table, semaine)
      pour l'extraire) et retourne un dictionnaire par colleur.
      Ce dernier dictionnaire contiendra la colle de la semaine.
-     Si le colleurfait plusieurs colles, il faut voir si on met une 
+     Si le colleur fait plusieurs colles, il faut voir si on met une 
      liste...
      
      Arguments
      * table : une liste de colle pour UNE semaine
+     * classe : le nom de la classe pour que le colleur s'y retrouve
 
      Retourne
      * dictionnaire: (prof: colles)
@@ -389,9 +390,9 @@ def sort_profs(table):
 
     profs = {}
     for colle in table:
-        if colle.prof in profs:
-            profs[colle.prof].append(colle)
-        else:
-            profs[colle.prof] = [colle]
-            
+        if colle.prof not in profs:
+            profs[colle.prof] = Week(classe)
+
+        profs[colle.prof].append(colle)
+
     return profs

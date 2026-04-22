@@ -9,3 +9,4 @@
 *.zip
 **/*.ini
 /src/temp-emails
+/Qt/venv

@@ -37,8 +37,9 @@ def dt(h1, h2):
 
 
 class EDT:
-    def __init__(self, path, name, lang, title):
+    def __init__(self, path, name, lang, title, iscolle):
         self.wb = xl.load_workbook(path)
+        self.iscolle = iscolle
         self.colles = []
         self.name = name
         self.lang = lang
@@ -56,8 +57,13 @@ class EDT:
                     self.sh.cell(column=col, row=row).value = self.title.format(groupe = groupe,
                                                                                 semaine = semaine,
                                                                                 colle = colle,)
-                elif v.upper() == 'DS':
+
+                elif v.upper() == 'DS' and semaine.DS is not None:
                     self.sh.cell(column = col, row = row).value = f'DS\n{semaine.DS}'
+
+                elif v.upper() == 'DS' and semaine.DS is None:
+                    self.sh.cell(column = col, row = row).value = ''
+                    self.sh.cell(column = col, row = row).fill = WHITE_FILL
 
                 if 'LV2' in v.upper():
                     if self.lang is not None:
@@ -93,14 +99,14 @@ class EDT:
                     heure_cl = colle.heure.lower().replace('00', '').split('-')[0]
                     jour_cl = colle.jour.lower()
 
-                    if jour_edt == jour_cl and dt(heure_cl, heure_edt):
+                    if jour_edt == jour_cl and dt(heure_cl, heure_edt) and self.iscolle:
                         self.sh.cell(column=col, row = row).value = '{colleur} {salle}'.format(
                             salle = colle.salle,
                             colleur = colle.prof)
 
                         return True
 
-        return False
+        return not self.iscolle
 
     def export(self, folder):
         for col in range(1, 40): # range du nombre de colonnes de l'EDT
@@ -123,17 +129,19 @@ class EDT:
         return excelsaver.export_pdf(fp + '.xlsx')
 
 
-def zip_output(paths, semaine, folder):
+def zip_output(paths, semaine, folder, file):
     """Une fois l'enregistrement terminé, on peut mettre dans un fichier ZIP
     l'intégralité des EDT de sortie. Pour cela,
     Arguments
     * paths  : la liste des fichiers à mettre en ZIP
     * semaine: le numéro de la semaine
+    * folder : le dossier d'enregistrement
+    * file: le nom du fichier à enregistrer
 
     Ne retourne rien
     """
 
-    z = ZipFile(f'./{folder}/output-S{semaine}.zip', 'w', compression=ZIP_DEFLATED, compresslevel=9)
+    z = ZipFile(os.path.join(folder, file), 'w', compression=ZIP_DEFLATED, compresslevel=9)
     for fp in paths:
         f = open(fp, 'rb')
         data = f.read()
@@ -145,7 +153,7 @@ def zip_output(paths, semaine, folder):
 
     z.close()
 
-def fill_edt(groupes, path, folder, semaine_nb, table_addr, config):
+def fill_edt(groupes, path, folder, semaine_nb, table_addr, config, iscolle):
     """Avec un dictionnaire des groupes de colle et un emploi du temps,
     vient remplir les trous volontairement laissés par le professeur
     en charge de la création des emplois du temps.
@@ -159,7 +167,8 @@ def fill_edt(groupes, path, folder, semaine_nb, table_addr, config):
     * folder  : dossier de sortie des emplois du temps générés
     * semaine : le numéro de la semaine en cours
     * table_addr: la table des élèves avec leurs adresses mails, ...
-    * config  : la configuration 
+    * config  : la configuration
+    * iscolles : active le remplissage des colles
     """
 
     pc = 0.0
@@ -174,9 +183,9 @@ def fill_edt(groupes, path, folder, semaine_nb, table_addr, config):
 
     p = box.Progress('Compilation...', length=3*len(groupes), larg = lm)
     for groupe, semaine in groupes.items():
-        groupe_id = semaine.groupe_id
+        groupe_id = semaine.ide
         for nom, family, _, lang, ssgrp in table_addr[groupe]:
-            edt = EDT(path, nom+'.'+family, lang, config.edt_title)
+            edt = EDT(path, nom+'.'+family, lang, config.edt_title, iscolle)
             edt.feed(groupe_id, ssgrp)
             edt.me(groupe, semaine.colles[0].semaine, semaine.colles[0].colle_id) # On récupère le numéro de la semaine via la première colle du groupe
 
@@ -195,7 +204,7 @@ def fill_edt(groupes, path, folder, semaine_nb, table_addr, config):
     if ce:
         box.warning('Colision de colles !', ce)
 
-    zip_output(fps, semaine_nb, folder)
+    zip_output(fps, semaine_nb, folder, config.output_zip.format(semaine = semaine_nb))
     return True
 
 def clear():

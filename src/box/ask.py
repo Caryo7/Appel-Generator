@@ -2,12 +2,12 @@ from graph import *
 import automail
 import getpass
 
-def askEmail():
+def askEmail(addr = '', pwd = ''):
     ems = automail.EmailSender()
     r = False
     while not r:
-        mail = Prompt('Adresse mail')
-        pwd = Prompt('Mot de passe', show = '*', fnct = getpass.getpass)
+        mail = Prompt('Adresse mail', value = addr)
+        pwd = Prompt('Mot de passe', show = '*', fnct = getpass.getpass, value = pwd)
         data = askData('Veuillez entrer vos coordonnées mail',
                              prompts = [mail, pwd])
 
